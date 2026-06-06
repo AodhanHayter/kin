@@ -1,5 +1,6 @@
 # k3s worker node (apollo, hermes). Joins the cluster led by atlas.
 { config, ... }:
+
 {
   networking.firewall = {
     allowedTCPPorts = [
