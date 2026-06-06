@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=https://devenv.sh/devenv.schema.json
+inputs:
+  clan-core:
+    url: tarball+https://git.clan.lol/clan/clan-core/archive/25.11.tar.gz
+  git-hooks:
+    url: github:cachix/git-hooks.nix
+    inputs:
+      nixpkgs:
+        follows: nixpkgs
+  nixpkgs:
+    url: github:cachix/devenv-nixpkgs/rolling
