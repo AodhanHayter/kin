@@ -1,6 +1,6 @@
 # Shared disko layout — identical /dev/sda partitioning across all three nodes.
 # Load-bearing: these machines have no fileSystems in hardware config; disko
-# generates every mount (/, /boot, swap, gluster brick).
+# generates every mount (/, /boot, swap, longhorn data).
 {
   disko.devices = {
     disk = {
@@ -30,12 +30,15 @@
                 discardPolicy = "both";
               };
             };
+            # Longhorn data dir. Partition key kept as `gluster` so the on-disk
+            # partlabel (disk-sda-gluster) is unchanged on the live nodes — only
+            # the mountpoint moves. xfs is Longhorn's recommended filesystem.
             gluster = {
               size = "100G";
               content = {
                 type = "filesystem";
                 format = "xfs";
-                mountpoint = "/data/glusterfs/brick1";
+                mountpoint = "/var/lib/longhorn";
               };
             };
             root = {

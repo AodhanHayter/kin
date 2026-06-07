@@ -27,15 +27,19 @@
       ];
       forAllSystems = nixpkgs.lib.genAttrs adminSystems;
 
-      # Shared NixOS modules every machine imports.
+      # Modules every machine imports, regardless of hardware.
       # (disko's module is provided by clan-core, so we don't import it here.)
-      base = [
+      baseCommon = [
         ./modules/common.nix
+        ./modules/tailscale.nix
+        ./modules/longhorn.nix
+        ./modules/k3s-token.nix
+      ];
+      # The three Beelink EQ13 nodes additionally share one hardware profile +
+      # /dev/sda disko layout. Non-EQ13 machines (e.g. lenny) bring their own.
+      baseEq13 = baseCommon ++ [
         ./modules/hardware-beelink-eq13.nix
         ./modules/disko.nix
-        ./modules/tailscale.nix
-        ./modules/gluster.nix
-        ./modules/k3s-token.nix
       ];
 
       clan = clan-core.lib.clan {
@@ -48,15 +52,19 @@
         machines = {
           atlas = {
             nixpkgs.hostPlatform = system;
-            imports = base ++ [ ./machines/atlas/configuration.nix ];
+            imports = baseEq13 ++ [ ./machines/atlas/configuration.nix ];
           };
           apollo = {
             nixpkgs.hostPlatform = system;
-            imports = base ++ [ ./machines/apollo/configuration.nix ];
+            imports = baseEq13 ++ [ ./machines/apollo/configuration.nix ];
           };
           hermes = {
             nixpkgs.hostPlatform = system;
-            imports = base ++ [ ./machines/hermes/configuration.nix ];
+            imports = baseEq13 ++ [ ./machines/hermes/configuration.nix ];
+          };
+          lenny = {
+            nixpkgs.hostPlatform = system;
+            imports = baseCommon ++ [ ./machines/lenny/configuration.nix ];
           };
         };
 
@@ -75,12 +83,60 @@
               deploy.targetHost = "root@hermes.local";
               tags = [ "k3s-agent" ];
             };
+            lenny = {
+              deploy.targetHost = "root@lenny.local";
+              tags = [ "k3s-agent" ];
+            };
           };
         };
       };
     in
     {
-      inherit (clan.config) nixosConfigurations nixosModules clanInternals;
+      # clan-managed machines + a generic keyed installer ISO used to bootstrap
+      # fresh boxes (boot it, then `clan machines install` over ssh).
+      nixosConfigurations = clan.config.nixosConfigurations // {
+        installer = nixpkgs.lib.nixosSystem {
+          inherit system;
+          modules = [
+            (
+              {
+                modulesPath,
+                pkgs,
+                ...
+              }:
+              {
+                imports = [ (modulesPath + "/installer/cd-dvd/installation-cd-minimal.nix") ];
+
+                networking.hostName = "kin-installer";
+
+                services.openssh = {
+                  enable = true;
+                  settings.PermitRootLogin = "prohibit-password";
+                };
+                users.users.root.openssh.authorizedKeys.keys = import ./modules/ssh-keys.nix;
+
+                # mDNS so `kin-installer.local` resolves without hunting the IP.
+                services.avahi = {
+                  enable = true;
+                  nssmdns4 = true;
+                  publish = {
+                    enable = true;
+                    addresses = true;
+                    workstation = true;
+                  };
+                };
+
+                nix.settings.experimental-features = [
+                  "nix-command"
+                  "flakes"
+                ];
+                environment.systemPackages = with pkgs; [ git ];
+              }
+            )
+          ];
+        };
+      };
+      inherit (clan.config) nixosModules clanInternals;
       clan = clan.config;
 
       # The dev shell lives in devenv.nix (devenv.sh), not here.
