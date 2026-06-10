@@ -1,22 +1,8 @@
-# k3s worker node (apollo, hermes). Joins the cluster led by atlas.
+# k3s worker node (apollo, hermes, lenny). Joins the cluster led by atlas.
 { config, ... }:
 
 {
-  networking.firewall = {
-    allowedTCPPorts = [
-      6443
-      2379
-      2380
-    ];
-    allowedUDPPorts = [
-      8472 # flannel vxlan
-    ];
-  };
-
-  services.openiscsi = {
-    enable = true;
-    name = "iqn.2020-08.org.linux-iscsi.initiatorhost:nixos";
-  };
+  imports = [ ./k3s-common.nix ];
 
   services.k3s = {
     enable = true;

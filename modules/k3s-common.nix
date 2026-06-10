@@ -1,0 +1,25 @@
+# Shared k3s node baseline (server + agents): firewall, iSCSI, atlas pin.
+{
+  networking.firewall = {
+    allowedTCPPorts = [
+      10250 # kubelet — metrics-server scrapes <node-ip>:10250
+    ];
+    allowedUDPPorts = [
+      8472 # flannel vxlan
+    ];
+  };
+
+  # Pin the k3s join address (serverAddr = https://atlas.local:6443) in
+  # /etc/hosts so it does not depend on avahi/mDNS being up when k3s starts.
+  # Requires a DHCP reservation for atlas at the router — keep in sync.
+  networking.hosts."10.10.0.100" = [
+    "atlas.local"
+    "atlas"
+  ];
+
+  # Longhorn / iSCSI support.
+  services.openiscsi = {
+    enable = true;
+    name = "iqn.2020-08.org.linux-iscsi.initiatorhost:nixos";
+  };
+}
