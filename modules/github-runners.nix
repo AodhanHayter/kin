@@ -1,7 +1,7 @@
 # GitHub Actions runners on the cluster via ARC (actions-runner-controller),
 # deployed from the server through k3s' helm-controller — same pattern as
 # Longhorn. One runner scale set per entry in `repos`; workflows target them
-# with `runs-on: k3s`. Runners are ephemeral, scale 0->4, dind for docker.
+# with `runs-on: homelab-k3s`. Runners are ephemeral, scale 0->4, dind for docker.
 #
 # Auth is a classic PAT with `repo` scope, prompted once:
 #   clan vars generate --generator github-runner-token
@@ -60,7 +60,7 @@ let
         valuesContent = ''
           githubConfigUrl: ${url}
           githubConfigSecret: ${secretName}
-          runnerScaleSetName: k3s
+          runnerScaleSetName: homelab-k3s
           minRunners: 0
           maxRunners: 4
           containerMode:

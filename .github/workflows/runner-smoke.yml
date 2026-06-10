@@ -9,7 +9,7 @@ on:
 
 jobs:
   smoke:
-    runs-on: k3s
+    runs-on: homelab-k3s
     steps:
       - uses: actions/checkout@v4
       - name: prove runner + dind work
