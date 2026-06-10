@@ -1,5 +1,5 @@
 # k3s control-plane node (atlas). Initializes the embedded-etcd HA cluster.
-{ config, ... }:
+{ config, pkgs, ... }:
 {
   imports = [ ./k3s-common.nix ];
 
@@ -10,11 +10,22 @@
     2380 # etcd peers
   ];
 
+  # Bare `kubectl` for root on the server (agents have no credentials).
+  environment.systemPackages = [ pkgs.kubectl ];
+  environment.variables.KUBECONFIG = "/etc/rancher/k3s/k3s.yaml";
+
   services.k3s = {
     enable = true;
     role = "server";
     clusterInit = true;
     tokenFile = config.clan.core.vars.generators.k3s-token.files."token".path;
+
+    # Extra names on the API serving cert so kubectl works from the Mac
+    # (LAN via mDNS name, anywhere via tailnet name).
+    extraFlags = [
+      "--tls-san=atlas.local"
+      "--tls-san=atlas.tail30507a.ts.net"
+    ];
 
     # Longhorn is the storage layer; drop k3s' bundled local-path provisioner so
     # there is a single default StorageClass (longhorn) instead of two.

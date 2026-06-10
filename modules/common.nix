@@ -92,6 +92,5 @@ in
     git
     vim
     htop
-    kubectl
   ];
 }

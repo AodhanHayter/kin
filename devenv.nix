@@ -8,6 +8,10 @@
     inputs.clan-core.packages.${pkgs.stdenv.system}.clan-cli
     pkgs.git
     pkgs.nixfmt-rfc-style
+    # Drive the cluster from the Mac (kubeconfig: ~/.kube/config -> atlas).
+    pkgs.kubectl
+    pkgs.kubernetes-helm
+    pkgs.k9s
   ];
 
   # https://devenv.sh/basics/

@@ -17,6 +17,10 @@
     "atlas"
   ];
 
+  # Drain pods cleanly on reboot/shutdown (kernel bumps are frequent on a
+  # test cluster; without this, pods are killed mid-write).
+  services.k3s.gracefulNodeShutdown.enable = true;
+
   # Longhorn / iSCSI support.
   services.openiscsi = {
     enable = true;
