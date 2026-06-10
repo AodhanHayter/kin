@@ -5,6 +5,7 @@
     ./hardware-configuration.nix
     ../../modules/disko-lenny.nix
     ../../modules/k3s-agent.nix
+    ../../modules/garage.nix
   ];
 
   networking.hostName = "lenny";

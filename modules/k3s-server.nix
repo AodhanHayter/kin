@@ -1,7 +1,10 @@
 # k3s control-plane node (atlas). Initializes the embedded-etcd HA cluster.
 { config, pkgs, ... }:
 {
-  imports = [ ./k3s-common.nix ];
+  imports = [
+    ./k3s-common.nix
+    ./garage-backup-key.nix
+  ];
 
   # Server-only ports (agents dial out; they listen on none of these).
   networking.firewall.allowedTCPPorts = [
@@ -56,6 +59,12 @@
             defaultSettings:
               defaultDataPath: /var/lib/longhorn
               defaultReplicaCount: 3
+              # The Longhorn partition is dedicated; the default 30% reserve
+              # is meant for shared disks.
+              storageReservedPercentageForDefaultDisk: 10
+              # Garage on lenny; credentials synced by longhorn-backup-credentials.
+              backupTarget: s3://longhorn-backups@garage/
+              backupTargetCredentialSecret: longhorn-backup-credentials
             persistence:
               defaultClass: true
               defaultClassReplicaCount: 3
@@ -63,5 +72,34 @@
         };
       }
     ];
+  };
+
+  # Garage S3 credentials for Longhorn backups (same pattern as the ARC PAT:
+  # secrets can't ride HelmChart manifests through the world-readable store).
+  systemd.services.longhorn-backup-credentials = {
+    description = "Sync Garage S3 credentials into longhorn-system";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "k3s.service" ];
+    wants = [ "k3s.service" ];
+    path = [ config.services.k3s.package ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+      until k3s kubectl get --raw /readyz >/dev/null 2>&1; do sleep 5; done
+      k3s kubectl create namespace longhorn-system --dry-run=client -o yaml \
+        | k3s kubectl apply -f -
+      k3s kubectl -n longhorn-system create secret generic longhorn-backup-credentials \
+        --from-file=AWS_ACCESS_KEY_ID=${
+          config.clan.core.vars.generators.garage-backup-key.files."access-key-id".path
+        } \
+        --from-file=AWS_SECRET_ACCESS_KEY=${
+          config.clan.core.vars.generators.garage-backup-key.files."secret-access-key".path
+        } \
+        --from-literal=AWS_ENDPOINTS=http://10.10.0.42:3900 \
+        --dry-run=client -o yaml | k3s kubectl apply -f -
+    '';
   };
 }
