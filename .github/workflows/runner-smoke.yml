@@ -1,17 +1,12 @@
 name: runner-smoke
 
-on:
-  workflow_dispatch:
-  # workflow_dispatch only works once this file is on the default branch;
-  # push trigger lets the smoke test run from the feature branch too.
-  push:
-    branches: [github-runners]
+on: workflow_dispatch
 
 jobs:
   smoke:
     runs-on: homelab-k3s
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: prove runner + dind work
         run: |
           echo "runner: $(hostname)"
