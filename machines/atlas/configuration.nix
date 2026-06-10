@@ -2,6 +2,7 @@
 {
   imports = [
     ../../modules/k3s-server.nix
+    ../../modules/github-runners.nix
   ];
 
   networking.hostName = "atlas";

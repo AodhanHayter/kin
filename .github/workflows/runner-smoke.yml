@@ -1,0 +1,14 @@
+name: runner-smoke
+
+on: workflow_dispatch
+
+jobs:
+  smoke:
+    runs-on: k3s
+    steps:
+      - uses: actions/checkout@v4
+      - name: prove runner + dind work
+        run: |
+          echo "runner: $(hostname)"
+          uname -a
+          docker info --format 'docker server: {{.ServerVersion}}'
