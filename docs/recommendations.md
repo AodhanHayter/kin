@@ -106,7 +106,12 @@ tooling owns the workloads.
 
 ## P3 — leverage idle hardware
 
-### 8. lenny's 1 TB HDD is completely unused
+### 8. lenny's 1 TB HDD is completely unused — DONE
+Resolved with Garage (not MinIO — licensing): single-node S3 on lenny's HDD
+(`modules/garage.nix`), buckets `longhorn-backups` + `etcd-snapshots`,
+Longhorn BackupTarget wired and verified `available: true`.
+
+Original notes:
 `/mnt/bulk` was provisioned as "Longhorn backup target" but Longhorn has **no
 backup target configured**. Wire it up: export it over NFS from lenny and set
 the Longhorn default:
@@ -121,7 +126,12 @@ This turns on volume backup/restore/DR testing — exactly the kind of infra
 approach worth rehearsing. Alternative: MinIO on lenny (S3 API) — heavier, but
 more realistic and reusable for etcd snapshots (#10).
 
-### 9. EQ13 Longhorn capacity is artificially small
+### 9. EQ13 Longhorn capacity is artificially small — DONE
+Resolved the destructive way (full cluster rebuild, new disko layouts):
+EQ13s now give Longhorn the whole disk minus 100 G root (~372 G/node),
+reserve lowered to 10%. lenny contributes ~135 G from its SSD.
+
+Original notes:
 Each EQ13 gives Longhorn 100 G, minus the default 30% reserve → ~68 G usable
 per node (≈68 G effective at replica-3), while 350 G sits idle on `/`.
 Non-destructive expansion: create `/var/lib/longhorn-extra` on the root fs and
@@ -131,7 +141,13 @@ repartitioning, no disko change. Also consider whether the default
 that reserve exists to protect shared disks, and the partition is exclusive to
 Longhorn.
 
-### 10. etcd snapshots are local-only, single etcd member
+### 10. etcd snapshots are local-only, single etcd member — DONE
+Resolved via `--etcd-s3` + `--etcd-s3-config-secret` against Garage
+(bucket `etcd-snapshots`); scheduled 12 h snapshots upload off-node.
+On-demand saves need the flags repeated:
+`k3s etcd-snapshot save --etcd-s3 --etcd-s3-config-secret=etcd-s3-config`.
+
+Original notes:
 k3s already snapshots etcd every 12 h to atlas' own disk — useless if atlas'
 SSD dies. Ship them off-node: a systemd timer rsyncing
 `/var/lib/rancher/k3s/server/db/snapshots/` to `lenny:/mnt/bulk/etcd/`, or
