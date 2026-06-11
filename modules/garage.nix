@@ -86,8 +86,12 @@ in
       node=$(garage node id -q | cut -d@ -f1)
       if ! garage layout show | grep -q "''${node:0:16}"; then
         garage layout assign -z home -c 900G "$node"
-        version=$(garage layout show | sed -n 's/.*version \([0-9]*\).*/\1/p' | tail -1)
-        garage layout apply --version $((version + 1))
+      fi
+      # `layout show` prints the exact version to apply when changes are
+      # staged; no hint means nothing staged.
+      version=$(garage layout show | sed -n 's/.*apply --version \([0-9]*\).*/\1/p' | tail -1)
+      if [ -n "$version" ]; then
+        garage layout apply --version "$version"
       fi
 
       access=$(cat ${accessKeyPath})
