@@ -8,6 +8,7 @@
 # without manual `garage` commands.
 {
   config,
+  lib,
   pkgs,
   ...
 }:
@@ -41,8 +42,8 @@ in
   clan.core.vars.generators.garage-rpc-secret = {
     files."env".secret = true;
     runtimeInputs = [ pkgs.openssl ];
-    # EnvironmentFile form: the daemon runs with DynamicUser, so it can't
-    # read a root-owned secret path itself; systemd injects this as root.
+    # EnvironmentFile form keeps the secret out of the world-readable
+    # nix-store TOML config; systemd injects it at start.
     script = ''
       printf 'GARAGE_RPC_SECRET=%s' "$(openssl rand -hex 32)" > "$out"/env
     '';
@@ -54,6 +55,12 @@ in
     environmentFile = rpcEnvPath;
     settings = garageSettings;
   };
+
+  # /var/lib/garage is a disko mountpoint (the 1 TB HDD). The module default
+  # DynamicUser=true makes systemd try to replace it with a symlink into
+  # /var/lib/private, which fails with "Device or resource busy" — run as
+  # root instead so the mountpoint can stay.
+  systemd.services.garage.serviceConfig.DynamicUser = lib.mkForce false;
 
   # S3 API for Longhorn / k3s on the other nodes.
   networking.firewall.allowedTCPPorts = [ 3900 ];
