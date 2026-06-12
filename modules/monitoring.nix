@@ -2,7 +2,12 @@
 # Alertmanager + node-exporter + kube-state-metrics + default dashboards),
 # deployed cluster-wide from the server via k3s' bundled helm-controller —
 # same pattern as Longhorn. Server-side module: imported by k3s-server.nix.
-{ config, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 {
   # k3s runs the whole control plane in one process with metrics listeners
   # bound to localhost; rebind them so Prometheus can scrape from the pod
@@ -17,9 +22,66 @@
     10257 # kube-controller-manager metrics (https)
     10259 # kube-scheduler metrics (https)
     2381 # etcd metrics (http)
-    30300 # Grafana NodePort
-    30900 # Prometheus NodePort
+    80 # traefik ingress (svclb) — grafana.local / prometheus.local
+    443 # traefik ingress (svclb)
   ];
+
+  # mDNS aliases for the ingress hostnames. Traefik routes on Host header;
+  # these make grafana.local / prometheus.local resolve to atlas without a
+  # LAN DNS server or router config. avahi-publish blocks, so Restart=always.
+  # avahi denies client entry groups ("Not permitted") unless user-service
+  # publishing is on — the publish units below register via the same D-Bus API.
+  services.avahi.publish.userServices = true;
+  systemd.services =
+    lib.genAttrs
+      (map (n: "avahi-alias-${n}") [
+        "grafana"
+        "prometheus"
+      ])
+      (
+        unit:
+        let
+          name = lib.removePrefix "avahi-alias-" unit;
+        in
+        {
+          description = "mDNS alias ${name}.local -> atlas";
+          after = [ "avahi-daemon.service" ];
+          requires = [ "avahi-daemon.service" ];
+          wantedBy = [ "multi-user.target" ];
+          serviceConfig = {
+            ExecStart = "${pkgs.avahi}/bin/avahi-publish -a -R ${name}.local 10.10.0.100";
+            Restart = "always";
+            RestartSec = 5;
+          };
+        }
+      )
+    // {
+      # Same pattern as longhorn-backup-credentials: secrets reach k8s via
+      # kubectl at activation, never via manifests.
+      grafana-admin-secret = {
+        description = "Sync Grafana admin credentials into a k8s Secret";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "k3s.service" ];
+        wants = [ "k3s.service" ];
+        path = [ config.services.k3s.package ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+        };
+        script = ''
+          export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+          until k3s kubectl get --raw /readyz >/dev/null 2>&1; do sleep 5; done
+          k3s kubectl create namespace monitoring --dry-run=client -o yaml \
+            | k3s kubectl apply -f -
+          k3s kubectl -n monitoring create secret generic grafana-admin \
+            --from-literal=admin-user=admin \
+            --from-file=admin-password=${
+              config.clan.core.vars.generators.grafana-admin.files."password".path
+            } \
+            --dry-run=client -o yaml | k3s kubectl apply -f -
+        '';
+      };
+    };
 
   # Grafana admin password. Synced into the grafana-admin Secret below —
   # HelmChart valuesContent lands in the world-readable nix store, so the
@@ -56,9 +118,9 @@
               existingSecret: grafana-admin
               userKey: admin-user
               passwordKey: admin-password
-            service:
-              type: NodePort
-              nodePort: 30300
+            ingress:
+              enabled: true
+              hosts: [grafana.local]
             persistence:
               enabled: true
               size: 5Gi
@@ -67,9 +129,10 @@
               type: Recreate
 
           prometheus:
-            service:
-              type: NodePort
-              nodePort: 30900
+            ingress:
+              enabled: true
+              hosts: [prometheus.local]
+              paths: ["/"]
             prometheusSpec:
               retention: 15d
               retentionSize: 25GB
@@ -109,29 +172,4 @@
     }
   ];
 
-  # Same pattern as longhorn-backup-credentials: secrets reach k8s via
-  # kubectl at activation, never via manifests.
-  systemd.services.grafana-admin-secret = {
-    description = "Sync Grafana admin credentials into a k8s Secret";
-    wantedBy = [ "multi-user.target" ];
-    after = [ "k3s.service" ];
-    wants = [ "k3s.service" ];
-    path = [ config.services.k3s.package ];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-    };
-    script = ''
-      export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-      until k3s kubectl get --raw /readyz >/dev/null 2>&1; do sleep 5; done
-      k3s kubectl create namespace monitoring --dry-run=client -o yaml \
-        | k3s kubectl apply -f -
-      k3s kubectl -n monitoring create secret generic grafana-admin \
-        --from-literal=admin-user=admin \
-        --from-file=admin-password=${
-          config.clan.core.vars.generators.grafana-admin.files."password".path
-        } \
-        --dry-run=client -o yaml | k3s kubectl apply -f -
-    '';
-  };
 }
