@@ -3,6 +3,7 @@
   networking.firewall = {
     allowedTCPPorts = [
       10250 # kubelet — metrics-server scrapes <node-ip>:10250
+      9100 # node-exporter (hostNetwork) — Prometheus scrapes <node-ip>:9100
     ];
     allowedUDPPorts = [
       8472 # flannel vxlan

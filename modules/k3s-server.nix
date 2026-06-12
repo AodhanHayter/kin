@@ -4,6 +4,7 @@
   imports = [
     ./k3s-common.nix
     ./garage-backup-key.nix
+    ./monitoring.nix
   ];
 
   # Server-only ports (agents dial out; they listen on none of these).

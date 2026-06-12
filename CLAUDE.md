@@ -26,6 +26,7 @@ modules/
   k3s-server.nix              role=server, clusterInit, firewall, openiscsi
   k3s-agent.nix               role=agent, serverAddr=https://atlas.local:6443, firewall, openiscsi
   longhorn.nix / tailscale.nix Longhorn host prereqs (iscsi/nfs/FHS shims) / tailscale
+  monitoring.nix              kube-prometheus-stack HelmChart (server-side; Grafana NodePort 30300, Prometheus 30900, control-plane metrics flags, grafana-admin var+secret sync)
 machines/<host>/hardware-configuration.nix    non-EQ13 nodes only (nixos-generate-config --no-filesystems)
 vars/shared/k3s-token/        sops-encrypted shared token (the `secret` file)
 vars/per-machine/<h>/state-version/
