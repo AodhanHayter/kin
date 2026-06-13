@@ -44,7 +44,12 @@
 
       clan = clan-core.lib.clan {
         self = self;
-        specialArgs = { };
+        # Snow-style module helpers (kin.mkBoolOpt / kin.enabled / ...) made
+        # available as the `kin` arg inside every machine module. Built from
+        # the flake-input lib (resolved before module eval — recursion-free).
+        specialArgs = {
+          kin = import ./lib { lib = nixpkgs.lib; };
+        };
 
         meta.name = "kin";
 
