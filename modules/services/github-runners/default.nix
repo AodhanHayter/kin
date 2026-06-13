@@ -6,8 +6,17 @@
 # Auth is a classic PAT with `repo` scope, prompted once:
 #   clan vars generate --generator github-runner-token
 # A oneshot unit syncs it into the arc-runners namespace as a k8s Secret.
-{ config, ... }:
+{
+  config,
+  lib,
+  kin,
+  ...
+}:
+with lib;
+with kin;
 let
+  cfg = config.kin.services.github-runners;
+
   arcVersion = "0.14.2";
   chartRepo = "oci://ghcr.io/actions/actions-runner-controller-charts";
   secretName = "github-config-secret";
@@ -71,36 +80,48 @@ let
   );
 in
 {
-  clan.core.vars.generators.github-runner-token = {
-    prompts.token = {
-      description = "GitHub classic PAT with `repo` scope (ARC runner registration)";
-      type = "hidden";
-      persist = true;
-    };
+  options.kin.services.github-runners = {
+    enable = mkBoolOpt false "Whether to deploy ARC GitHub Actions runners.";
   };
 
-  services.k3s.manifests.github-runners.content = namespaces ++ [ controller ] ++ scaleSets;
+  config = mkMerge [
+    # PAT generator — defined unconditionally so the encrypted var never
+    # depends on the toggle.
+    {
+      clan.core.vars.generators.github-runner-token = {
+        prompts.token = {
+          description = "GitHub classic PAT with `repo` scope (ARC runner registration)";
+          type = "hidden";
+          persist = true;
+        };
+      };
+    }
 
-  # The PAT can't live in a HelmChart manifest (nix store is world-readable),
-  # so it is synced from the sops-decrypted var into a k8s Secret at boot.
-  systemd.services.arc-github-token = {
-    description = "Sync GitHub PAT into the arc-runners namespace";
-    wantedBy = [ "multi-user.target" ];
-    after = [ "k3s.service" ];
-    wants = [ "k3s.service" ];
-    path = [ config.services.k3s.package ];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-    };
-    script = ''
-      export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-      until k3s kubectl get --raw /readyz >/dev/null 2>&1; do sleep 5; done
-      k3s kubectl create namespace arc-runners --dry-run=client -o yaml \
-        | k3s kubectl apply -f -
-      k3s kubectl -n arc-runners create secret generic ${secretName} \
-        --from-file=github_token=${tokenPath} \
-        --dry-run=client -o yaml | k3s kubectl apply -f -
-    '';
-  };
+    (mkIf cfg.enable {
+      services.k3s.manifests.github-runners.content = namespaces ++ [ controller ] ++ scaleSets;
+
+      # The PAT can't live in a HelmChart manifest (nix store is world-readable),
+      # so it is synced from the sops-decrypted var into a k8s Secret at boot.
+      systemd.services.arc-github-token = {
+        description = "Sync GitHub PAT into the arc-runners namespace";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "k3s.service" ];
+        wants = [ "k3s.service" ];
+        path = [ config.services.k3s.package ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+        };
+        script = ''
+          export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+          until k3s kubectl get --raw /readyz >/dev/null 2>&1; do sleep 5; done
+          k3s kubectl create namespace arc-runners --dry-run=client -o yaml \
+            | k3s kubectl apply -f -
+          k3s kubectl -n arc-runners create secret generic ${secretName} \
+            --from-file=github_token=${tokenPath} \
+            --dry-run=client -o yaml | k3s kubectl apply -f -
+        '';
+      };
+    })
+  ];
 }

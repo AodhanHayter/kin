@@ -27,19 +27,16 @@
       ];
       forAllSystems = nixpkgs.lib.genAttrs adminSystems;
 
-      # Modules every machine imports, regardless of hardware.
+      # Modules every machine imports, regardless of hardware. The cluster-node
+      # suite pulls in the baseline system/storage/secret modules + Tailscale.
       # (disko's module is provided by clan-core, so we don't import it here.)
       baseCommon = [
-        ./modules/system/common
-        ./modules/services/tailscale
-        ./modules/storage/longhorn-host
-        ./modules/secrets/k3s-token
+        ./modules/suites/cluster-node
       ];
       # The three Beelink EQ13 nodes additionally share one hardware profile +
       # /dev/sda disko layout. Non-EQ13 machines (e.g. lenny) bring their own.
       baseEq13 = baseCommon ++ [
-        ./modules/hardware/beelink-eq13
-        ./modules/storage/disko-eq13
+        ./modules/suites/eq13-node
       ];
 
       clan = clan-core.lib.clan {
