@@ -2,9 +2,9 @@
 { config, pkgs, ... }:
 {
   imports = [
-    ./k3s-common.nix
-    ./garage-backup-key.nix
-    ./monitoring.nix
+    ../../system/k3s-base
+    ../../secrets/garage-backup-key
+    ../../services/monitoring
   ];
 
   # Server-only ports (agents dial out; they listen on none of these).

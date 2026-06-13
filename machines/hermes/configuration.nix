@@ -1,7 +1,7 @@
 # hermes — k3s agent + gluster peer.
 {
   imports = [
-    ../../modules/k3s-agent.nix
+    ../../modules/roles/k3s-agent
   ];
 
   networking.hostName = "hermes";

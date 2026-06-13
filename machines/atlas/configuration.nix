@@ -1,8 +1,8 @@
 # atlas — k3s control-plane + gluster primary.
 {
   imports = [
-    ../../modules/k3s-server.nix
-    ../../modules/github-runners.nix
+    ../../modules/roles/k3s-server
+    ../../modules/services/github-runners
   ];
 
   networking.hostName = "atlas";

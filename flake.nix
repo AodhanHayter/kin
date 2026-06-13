@@ -30,16 +30,16 @@
       # Modules every machine imports, regardless of hardware.
       # (disko's module is provided by clan-core, so we don't import it here.)
       baseCommon = [
-        ./modules/common.nix
-        ./modules/tailscale.nix
-        ./modules/longhorn.nix
-        ./modules/k3s-token.nix
+        ./modules/system/common
+        ./modules/services/tailscale
+        ./modules/storage/longhorn-host
+        ./modules/secrets/k3s-token
       ];
       # The three Beelink EQ13 nodes additionally share one hardware profile +
       # /dev/sda disko layout. Non-EQ13 machines (e.g. lenny) bring their own.
       baseEq13 = baseCommon ++ [
-        ./modules/hardware-beelink-eq13.nix
-        ./modules/disko.nix
+        ./modules/hardware/beelink-eq13
+        ./modules/storage/disko-eq13
       ];
 
       clan = clan-core.lib.clan {
@@ -118,7 +118,7 @@
                   enable = true;
                   settings.PermitRootLogin = "prohibit-password";
                 };
-                users.users.root.openssh.authorizedKeys.keys = import ./modules/ssh-keys.nix;
+                users.users.root.openssh.authorizedKeys.keys = import ./modules/system/ssh-keys.nix;
 
                 # mDNS so `kin-installer.local` resolves without hunting the IP.
                 services.avahi = {

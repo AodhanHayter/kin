@@ -37,7 +37,7 @@ let
   secretKeyPath = config.clan.core.vars.generators.garage-backup-key.files."secret-access-key".path;
 in
 {
-  imports = [ ./garage-backup-key.nix ];
+  imports = [ ../../secrets/garage-backup-key ];
 
   clan.core.vars.generators.garage-rpc-secret = {
     files."env".secret = true;

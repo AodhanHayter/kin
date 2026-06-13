@@ -2,7 +2,7 @@
 { config, ... }:
 
 {
-  imports = [ ./k3s-common.nix ];
+  imports = [ ../../system/k3s-base ];
 
   services.k3s = {
     enable = true;

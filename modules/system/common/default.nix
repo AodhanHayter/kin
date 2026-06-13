@@ -9,8 +9,8 @@
 }:
 let
   # Authorized SSH keys (carried over from the snow openssh module).
-  # Shared with the installer image — see modules/ssh-keys.nix.
-  authorizedKeys = import ./ssh-keys.nix;
+  # Shared with the installer image — see modules/system/ssh-keys.nix.
+  authorizedKeys = import ../ssh-keys.nix;
 in
 {
   # --- nix ---

@@ -3,9 +3,9 @@
 {
   imports = [
     ./hardware-configuration.nix
-    ../../modules/disko-lenny.nix
-    ../../modules/k3s-agent.nix
-    ../../modules/garage.nix
+    ../../modules/storage/disko-lenny
+    ../../modules/roles/k3s-agent
+    ../../modules/services/garage
   ];
 
   networking.hostName = "lenny";
