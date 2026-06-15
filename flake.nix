@@ -1,5 +1,5 @@
 {
-  description = "kin: clan-managed k3s cluster (atlas/apollo/hermes)";
+  description = "kin: clan-managed k3s cluster (atlas/apollo/hermes/lenny)";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
@@ -16,7 +16,7 @@
       nixpkgs,
       clan-core,
       ...
-    }:
+    }@inputs:
     let
       system = "x86_64-linux";
 
@@ -27,70 +27,16 @@
       ];
       forAllSystems = nixpkgs.lib.genAttrs adminSystems;
 
-      # Modules every machine imports, regardless of hardware. The cluster-node
-      # suite pulls in the baseline system/storage/secret modules + Tailscale.
-      # (disko's module is provided by clan-core, so we don't import it here.)
-      baseCommon = [
-        ./modules/suites/cluster-node
-      ];
-      # The three Beelink EQ13 nodes additionally share one hardware profile +
-      # /dev/sda disko layout. Non-EQ13 machines (e.g. lenny) bring their own.
-      baseEq13 = baseCommon ++ [
-        ./modules/suites/eq13-node
-      ];
-
+      # The whole clan — meta, machines, tags and service instances — lives in
+      # ./clan.nix (the clan.lol native layout). flake.nix only wires it up and
+      # adds the bootstrap installer ISO. No snowfall-style lib, no per-machine
+      # import lists: machines/<name>/{configuration,hardware-configuration,
+      # disko}.nix are auto-included, and everything else is a clan.service
+      # deployed via inventory.instances.
       clan = clan-core.lib.clan {
-        self = self;
-        # Snow-style module helpers (kin.mkBoolOpt / kin.enabled / ...) made
-        # available as the `kin` arg inside every machine module. Built from
-        # the flake-input lib (resolved before module eval — recursion-free).
-        specialArgs = {
-          kin = import ./lib { lib = nixpkgs.lib; };
-        };
-
-        meta.name = "kin";
-
-        # Per-machine NixOS wiring: platform + module imports.
-        machines = {
-          atlas = {
-            nixpkgs.hostPlatform = system;
-            imports = baseEq13 ++ [ ./machines/atlas/configuration.nix ];
-          };
-          apollo = {
-            nixpkgs.hostPlatform = system;
-            imports = baseEq13 ++ [ ./machines/apollo/configuration.nix ];
-          };
-          hermes = {
-            nixpkgs.hostPlatform = system;
-            imports = baseEq13 ++ [ ./machines/hermes/configuration.nix ];
-          };
-          lenny = {
-            nixpkgs.hostPlatform = system;
-            imports = baseCommon ++ [ ./machines/lenny/configuration.nix ];
-          };
-        };
-
-        # Inventory: deploy targets + tags.
-        inventory = {
-          machines = {
-            atlas = {
-              deploy.targetHost = "root@atlas.local";
-              tags = [ "k3s-server" ];
-            };
-            apollo = {
-              deploy.targetHost = "root@apollo.local";
-              tags = [ "k3s-agent" ];
-            };
-            hermes = {
-              deploy.targetHost = "root@hermes.local";
-              tags = [ "k3s-agent" ];
-            };
-            lenny = {
-              deploy.targetHost = "root@lenny.local";
-              tags = [ "k3s-agent" ];
-            };
-          };
-        };
+        inherit self;
+        specialArgs = { inherit inputs; };
+        imports = [ ./clan.nix ];
       };
     in
     {
@@ -115,7 +61,7 @@
                   enable = true;
                   settings.PermitRootLogin = "prohibit-password";
                 };
-                users.users.root.openssh.authorizedKeys.keys = import ./modules/system/ssh-keys.nix;
+                users.users.root.openssh.authorizedKeys.keys = import ./modules/ssh-keys.nix;
 
                 # mDNS so `kin-installer.local` resolves without hunting the IP.
                 services.avahi = {

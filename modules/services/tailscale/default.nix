@@ -1,48 +1,50 @@
-# Tailscale, authenticated declaratively via a clan var.
+# kin/tailscale — Tailscale on every node, authenticated declaratively via a
+# shared clan var. Applied to roles.default.tags.all, so the authkey generator
+# exists on every machine.
 #
 # The auth key is a single shared secret prompted for once:
 #   1. Mint a REUSABLE auth key: https://login.tailscale.com/admin/settings/keys
-#   2. `clan vars generate --generator tailscale` and paste it.
-# Until the var is generated, `clan machines update` will prompt for it.
+#   2. `clan vars generate` and paste it.
+{ ... }:
 {
-  config,
-  lib,
-  kin,
-  ...
-}:
-with lib;
-with kin;
-let
-  cfg = config.kin.services.tailscale;
-in
-{
-  options.kin.services.tailscale = {
-    enable = mkBoolOpt false "Whether to enable Tailscale on this node.";
-    openFirewall = mkBoolOpt true "Open the Tailscale UDP port in the firewall.";
-  };
+  _class = "clan.service";
+  manifest.name = "kin/tailscale";
+  manifest.description = "Tailscale mesh VPN on every node, keyed by a shared auth key.";
+  manifest.categories = [ "Network" ];
 
-  config = mkMerge [
-    # Generator is defined UNCONDITIONALLY (outside mkIf): the generator name
-    # "tailscale" + file "authkey" are load-bearing string keys, and the
-    # encrypted var must exist regardless of the enable toggle so a disabled
-    # host can never silently drop the secret.
-    {
-      clan.core.vars.generators.tailscale = {
-        share = true; # one key, reused by every node
-        prompts.authkey = {
-          description = "Tailscale reusable auth key (admin console -> Settings -> Keys)";
-          type = "hidden";
-          persist = true;
+  roles.default = {
+    description = "Run Tailscale on a machine.";
+    interface =
+      { lib, ... }:
+      {
+        options.openFirewall = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Open the Tailscale UDP port in the firewall.";
         };
       };
-    }
+    perInstance =
+      { settings, ... }:
+      {
+        nixosModule =
+          { config, ... }:
+          {
+            # Shared auth key, reused by every node.
+            clan.core.vars.generators.tailscale = {
+              share = true;
+              prompts.authkey = {
+                description = "Tailscale reusable auth key (admin console -> Settings -> Keys)";
+                type = "hidden";
+                persist = true;
+              };
+            };
 
-    (mkIf cfg.enable {
-      services.tailscale = {
-        enable = true;
-        openFirewall = cfg.openFirewall;
-        authKeyFile = config.clan.core.vars.generators.tailscale.files."authkey".path;
+            services.tailscale = {
+              enable = true;
+              openFirewall = settings.openFirewall;
+              authKeyFile = config.clan.core.vars.generators.tailscale.files."authkey".path;
+            };
+          };
       };
-    })
-  ];
+  };
 }

@@ -1,20 +1,14 @@
-# lenny — Lenovo box, k3s agent + Garage backup target. Non-EQ13 hardware, so
-# it carries its own hardware scan + disko layout instead of the shared
-# Beelink modules.
-{ kin, ... }:
-with kin;
+# lenny — Lenovo box (non-EQ13), so it carries its own hardware scan + disko
+# layout instead of the shared Beelink modules. Its k3s-agent role and the
+# Garage backup target are assigned by inventory in clan.nix.
+{ ... }:
 {
   imports = [
     ./hardware-configuration.nix
     ../../modules/storage/disko-lenny
-    ../../modules/roles/k3s-agent
-    ../../modules/services/garage
   ];
 
   networking.hostName = "lenny";
-
-  kin.roles.k3s-agent = enabled;
-  kin.services.garage = enabled;
 
   # UEFI box — boots systemd-boot (the EQ13 nodes use grub on BIOS).
   boot.loader.systemd-boot.enable = true;

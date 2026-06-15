@@ -1,14 +1,13 @@
-# hermes — k3s agent + Longhorn storage node.
-{ kin, ... }:
-with kin;
+# hermes — EQ13 box. Its k3s-agent role comes from the inventory tag in
+# clan.nix; this file is just the machine's hardware + identity.
+{ ... }:
 {
   imports = [
-    ../../modules/roles/k3s-agent
+    ../../modules/hardware/beelink-eq13
+    ../../modules/storage/disko-eq13
   ];
 
   networking.hostName = "hermes";
-
-  kin.roles.k3s-agent = enabled;
 
   system.stateVersion = "24.05";
 }

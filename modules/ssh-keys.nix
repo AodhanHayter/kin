@@ -1,5 +1,5 @@
-# Authorized SSH keys for admins/deploy. Shared by common.nix (system users)
-# and the installer image (flake.nix) so both stay in sync.
+# Authorized SSH keys for admins/deploy. Imported by clan.nix (root + aodhan
+# user services, deploy access) and the installer image (flake.nix).
 [
   "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFnEsBv5zrOZzeQSymd/WKottg28l0mav/J0m0/Q3E4X aodhan.hayter@gmail.com"
   "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMTBSBlivmm4W46rP9m+qHPwumFuepcjP9Jl6iYhcZS5 aodhan.hayter@gmail.com"
