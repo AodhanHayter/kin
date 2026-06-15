@@ -7,6 +7,8 @@
 #   k3s-token         — shared k3s join token (server + all agents).
 #   garage-backup-key — shared S3 creds: consumed by atlas (Longhorn backups +
 #                       etcd snapshots) AND lenny (Garage import).
+#   nix-cache-key     — harmonia binary-cache keypair: sign-key signs on the
+#                       cache server (atlas), pub-key trusted by every client.
 { ... }:
 {
   _class = "clan.service";
@@ -40,6 +42,21 @@
               script = ''
                 printf 'GK%s' "$(openssl rand -hex 12)" > "$out"/access-key-id
                 printf '%s' "$(openssl rand -hex 32)" > "$out"/secret-access-key
+              '';
+            };
+
+            # harmonia binary-cache signing keypair. sign-key is consumed by the
+            # cache server (atlas) to sign served paths; pub-key (non-secret, so
+            # its .value is eval-readable) is added to every client's
+            # trusted-public-keys. Cross-host → lives here, not in kin/nix-cache.
+            clan.core.vars.generators.nix-cache-key = {
+              share = true;
+              files."sign-key".secret = true;
+              files."pub-key".secret = false;
+              runtimeInputs = [ pkgs.nix ];
+              script = ''
+                nix-store --generate-binary-cache-key kin-cache-1 \
+                  "$out"/sign-key "$out"/pub-key
               '';
             };
           };

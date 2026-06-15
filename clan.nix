@@ -53,6 +53,7 @@
     "kin/monitoring" = ./modules/services/monitoring;
     "kin/garage" = ./modules/services/garage;
     "kin/github-runners" = ./modules/services/github-runners;
+    "kin/nix-cache" = ./modules/services/nix-cache;
   };
 
   inventory.instances = {
@@ -173,6 +174,16 @@
         input = "self";
       };
       roles.default.tags.k3s-server = { };
+    };
+
+    # ---- harmonia binary cache: atlas serves, every node substitutes ----
+    nix-cache = {
+      module = {
+        name = "kin/nix-cache";
+        input = "self";
+      };
+      roles.server.machines.atlas = { };
+      roles.client.tags.all = { };
     };
   };
 }
