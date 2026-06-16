@@ -69,6 +69,12 @@
                         args = [
                           "tunnel"
                           "--no-autoupdate"
+                          # http2 transport: QUIC's UDP datagram handler flaps
+                          # on these nodes (kernel net.core.rmem_max ~208KiB <<
+                          # the 7MiB cloudflared wants), and we only proxy HTTP,
+                          # so QUIC buys nothing. http2 is stable + contained.
+                          "--protocol"
+                          "http2"
                           "--loglevel"
                           "info"
                           "run"
