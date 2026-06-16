@@ -54,6 +54,7 @@
     "kin/garage" = ./modules/services/garage;
     "kin/github-runners" = ./modules/services/github-runners;
     "kin/nix-cache" = ./modules/services/nix-cache;
+    "kin/cloudflared" = ./modules/services/cloudflared;
   };
 
   inventory.instances = {
@@ -171,6 +172,15 @@
     github-runners = {
       module = {
         name = "kin/github-runners";
+        input = "self";
+      };
+      roles.default.tags.k3s-server = { };
+    };
+
+    # ---- Cloudflare Tunnel connector (server only) ----
+    cloudflared = {
+      module = {
+        name = "kin/cloudflared";
         input = "self";
       };
       roles.default.tags.k3s-server = { };
