@@ -55,6 +55,7 @@
     "kin/github-runners" = ./modules/services/github-runners;
     "kin/nix-cache" = ./modules/services/nix-cache;
     "kin/cloudflared" = ./modules/services/cloudflared;
+    "kin/hello" = ./modules/services/hello;
   };
 
   inventory.instances = {
@@ -181,6 +182,15 @@
     cloudflared = {
       module = {
         name = "kin/cloudflared";
+        input = "self";
+      };
+      roles.default.tags.k3s-server = { };
+    };
+
+    # ---- hello demo origin behind the tunnel (server applies manifests) ----
+    hello = {
+      module = {
+        name = "kin/hello";
         input = "self";
       };
       roles.default.tags.k3s-server = { };
