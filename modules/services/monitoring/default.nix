@@ -73,7 +73,7 @@
                     requires = [ "avahi-daemon.service" ];
                     wantedBy = [ "multi-user.target" ];
                     serviceConfig = {
-                      ExecStart = "${pkgs.avahi}/bin/avahi-publish -a -R ${name}.local 10.10.0.100";
+                      ExecStart = "${pkgs.avahi}/bin/avahi-publish -a -R ${name}.local 10.10.3.100";
                       Restart = "always";
                       RestartSec = 5;
                     };
@@ -161,17 +161,17 @@
                     # by node IP. Serving certs don't carry that IP as a SAN, hence
                     # insecureSkipVerify.
                     kubeControllerManager:
-                      endpoints: [10.10.0.100]
+                      endpoints: [10.10.3.100]
                       serviceMonitor:
                         https: true
                         insecureSkipVerify: true
                     kubeScheduler:
-                      endpoints: [10.10.0.100]
+                      endpoints: [10.10.3.100]
                       serviceMonitor:
                         https: true
                         insecureSkipVerify: true
                     kubeEtcd:
-                      endpoints: [10.10.0.100]
+                      endpoints: [10.10.3.100]
                       service:
                         port: 2381
                         targetPort: 2381

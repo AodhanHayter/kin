@@ -139,7 +139,7 @@
                   --from-file=AWS_SECRET_ACCESS_KEY=${
                     config.clan.core.vars.generators.garage-backup-key.files."secret-access-key".path
                   } \
-                  --from-literal=AWS_ENDPOINTS=http://10.10.0.42:3900 \
+                  --from-literal=AWS_ENDPOINTS=http://10.10.3.42:3900 \
                   --dry-run=client -o yaml | k3s kubectl apply -f -
 
                 # defaultSettings.backupTarget only seeds on the manager's first
@@ -157,7 +157,7 @@
 
                 # S3 config for k3s etcd snapshots (--etcd-s3-config-secret).
                 k3s kubectl -n kube-system create secret generic etcd-s3-config \
-                  --from-literal=etcd-s3-endpoint=10.10.0.42:3900 \
+                  --from-literal=etcd-s3-endpoint=10.10.3.42:3900 \
                   --from-file=etcd-s3-access-key=${
                     config.clan.core.vars.generators.garage-backup-key.files."access-key-id".path
                   } \

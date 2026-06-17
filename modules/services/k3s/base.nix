@@ -16,7 +16,7 @@
 
   # Pin the k3s join address in /etc/hosts so it does not depend on avahi/mDNS
   # being up when k3s starts. Requires a DHCP reservation for atlas — keep in sync.
-  networking.hosts."10.10.0.100" = [
+  networking.hosts."10.10.3.100" = [
     "atlas.local"
     "atlas"
   ];
