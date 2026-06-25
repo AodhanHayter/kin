@@ -73,6 +73,7 @@
                 (map (n: "avahi-alias-${n}") [
                   "grafana"
                   "prometheus"
+                  "alertmanager"
                 ])
                 (
                   unit:
@@ -294,7 +295,15 @@
                     # rendered into git/nix. Watchdog (always-firing heartbeat) is
                     # routed to null so it doesn't email.
                     alertmanager:
+                      ingress:
+                        enabled: true
+                        hosts: [alertmanager.local]
+                        paths: ["/"]
                       alertmanagerSpec:
+                        # Base URL for "View in AlertManager" links in emails.
+                        # Reachable on the LAN via the alertmanager.local mDNS
+                        # alias + traefik ingress (same as grafana/prometheus).
+                        externalUrl: http://alertmanager.local
                         secrets:
                           - alertmanager-smtp
                       config:
