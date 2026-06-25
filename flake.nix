@@ -8,6 +8,12 @@
       url = "https://git.clan.lol/clan/clan-core/archive/25.11.tar.gz";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # GitOps pull-deploy (kin/comin). Module isn't in nixpkgs; comes from here.
+    comin = {
+      url = "github:nlewo/comin";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =

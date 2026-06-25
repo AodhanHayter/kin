@@ -57,6 +57,7 @@
     "kin/attic" = ./modules/services/attic;
     "kin/cloudflared" = ./modules/services/cloudflared;
     "kin/hello" = ./modules/services/hello;
+    "kin/comin" = ./modules/services/comin;
   };
 
   inventory.instances = {
@@ -140,6 +141,19 @@
         input = "self";
       };
       roles.default.tags.all = { };
+    };
+
+    # ---- comin GitOps: every node polls master and self-deploys ----
+    comin = {
+      module = {
+        name = "kin/comin";
+        input = "self";
+      };
+      roles.default.tags.all = { };
+      roles.default.settings = {
+        remoteUrl = "https://github.com/AodhanHayter/kin.git";
+        branch = "master";
+      };
     };
 
     # ---- k3s: atlas = server (clusterInit), the rest = agents ----
