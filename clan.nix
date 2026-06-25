@@ -54,6 +54,7 @@
     "kin/garage" = ./modules/services/garage;
     "kin/github-runners" = ./modules/services/github-runners;
     "kin/nix-cache" = ./modules/services/nix-cache;
+    "kin/attic" = ./modules/services/attic;
     "kin/cloudflared" = ./modules/services/cloudflared;
     "kin/hello" = ./modules/services/hello;
   };
@@ -204,6 +205,21 @@
       };
       roles.server.machines.atlas = { };
       roles.client.tags.all = { };
+    };
+
+    # ---- attic binary cache: atlas serves, every node substitutes; cross-arch
+    # + darwin push from non-clan hosts. publicKey set after cache bootstrap
+    # (see modules/services/attic header); empty -> client substituter is off.
+    attic = {
+      module = {
+        name = "kin/attic";
+        input = "self";
+      };
+      roles.server.machines.atlas = { };
+      roles.client = {
+        tags.all = { };
+        settings.publicKey = "kin:PBN2+XUcxLbw63KMem0RDJ2V+te0crwD5ucQeek3luw=";
+      };
     };
   };
 }
