@@ -67,6 +67,11 @@
                   branches.main.name = settings.branch;
                 }
               ];
+              # Expose the Prometheus exporter (:4243), scraped by
+              # kube-prometheus-stack (kin/monitoring) via the k8s node list.
+              # Blanket-opened like node-exporter's 9100 — VLAN4 isolation is the
+              # boundary, consistent with every other metrics port in kin.
+              exporter.openFirewall = true;
             };
           };
       };

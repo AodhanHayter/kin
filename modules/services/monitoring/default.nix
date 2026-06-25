@@ -156,6 +156,79 @@
                               resources:
                                 requests:
                                   storage: 30Gi
+                        # Scrape comin's exporter (:4243) on every node via the
+                        # k8s node list — comin runs on all nodes (tags.all), so
+                        # the node set IS the target set; no hardcoded IPs.
+                        additionalScrapeConfigs:
+                          - job_name: comin
+                            kubernetes_sd_configs:
+                              - role: node
+                            scheme: http
+                            metrics_path: /metrics
+                            scrape_interval: 30s
+                            relabel_configs:
+                              - source_labels: [__meta_kubernetes_node_address_InternalIP]
+                                target_label: __address__
+                                replacement: "$1:4243"
+                              - source_labels: [__meta_kubernetes_node_name]
+                                target_label: instance
+
+                    # comin GitOps health alerts. additionalPrometheusRulesMap is
+                    # rendered to a PrometheusRule by the chart, so its ruleSelector
+                    # picks them up. instance = node hostname (from the relabel above).
+                    additionalPrometheusRulesMap:
+                      comin:
+                        groups:
+                          - name: comin.rules
+                            rules:
+                              - alert: CominTargetDown
+                                expr: up{job="comin"} == 0
+                                for: 10m
+                                labels:
+                                  severity: warning
+                                annotations:
+                                  summary: "comin exporter down on {{ $labels.instance }}"
+                                  description: "Prometheus can't scrape comin :4243 on {{ $labels.instance }} for 10m; deploy state unknown."
+                              - alert: CominDeploymentFailed
+                                expr: comin_last_deployment_failed == 1
+                                for: 5m
+                                labels:
+                                  severity: critical
+                                annotations:
+                                  summary: "comin deployment FAILED on {{ $labels.instance }}"
+                                  description: "switch-to-configuration failed on {{ $labels.instance }} (comin_last_deployment_failed=1)."
+                              - alert: CominEvalOrBuildFailed
+                                expr: (comin_last_eval_failed == 1) or (comin_last_build_failed == 1)
+                                for: 15m
+                                labels:
+                                  severity: warning
+                                annotations:
+                                  summary: "comin eval/build failed on {{ $labels.instance }}"
+                                  description: "Node not converging: comin_last_eval_failed or comin_last_build_failed =1 on {{ $labels.instance }} for 15m."
+                              - alert: CominFetchFailed
+                                expr: max by (instance) (comin_last_fetch_failed) == 1
+                                for: 30m
+                                labels:
+                                  severity: warning
+                                annotations:
+                                  summary: "comin git fetch failing on {{ $labels.instance }}"
+                                  description: "comin_last_fetch_failed=1 (remote unreachable) on {{ $labels.instance }} for 30m."
+                              - alert: CominSuspended
+                                expr: comin_is_suspended == 1
+                                for: 1h
+                                labels:
+                                  severity: info
+                                annotations:
+                                  summary: "comin suspended on {{ $labels.instance }}"
+                                  description: "Automatic deploys paused (comin_is_suspended=1) on {{ $labels.instance }} for 1h."
+                              - alert: CominNeedReboot
+                                expr: comin_need_to_reboot == 1
+                                for: 6h
+                                labels:
+                                  severity: info
+                                annotations:
+                                  summary: "{{ $labels.instance }} needs reboot (comin)"
+                                  description: "comin_need_to_reboot=1 for 6h on {{ $labels.instance }}; kernel/initrd change not active until reboot."
 
                     # Control plane lives only on atlas (single k3s server); scrape it
                     # by node IP. Serving certs don't carry that IP as a SAN, hence
