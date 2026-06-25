@@ -33,6 +33,18 @@
               '';
             };
 
+            # Gmail App Password for Alertmanager SMTP (account
+            # aodhan.hayter@gmail.com). Prompted once; the account needs 2FA, then
+            # mint a 16-char app password at https://myaccount.google.com/apppasswords.
+            # Server-only generator (consumed where it runs), like grafana-admin.
+            clan.core.vars.generators.alertmanager-smtp = {
+              prompts.password = {
+                description = "Gmail App Password for aodhan.hayter@gmail.com SMTP (16 chars, no spaces)";
+                type = "hidden";
+                persist = true;
+              };
+            };
+
             # k3s runs the whole control plane in one process with metrics
             # listeners bound to localhost; rebind them so Prometheus can scrape
             # from the pod network. etcd gets its own flag (http on 0.0.0.0:2381).
@@ -102,6 +114,28 @@
                       --from-file=admin-password=${
                         config.clan.core.vars.generators.grafana-admin.files."password".path
                       } \
+                      --dry-run=client -o yaml | k3s kubectl apply -f -
+                  '';
+                };
+                # SMTP app password -> k8s Secret, mounted into Alertmanager via
+                # alertmanagerSpec.secrets and read by smtp_auth_password_file.
+                alertmanager-smtp-secret = {
+                  description = "Sync Alertmanager SMTP password into a k8s Secret";
+                  wantedBy = [ "multi-user.target" ];
+                  after = [ "k3s.service" ];
+                  wants = [ "k3s.service" ];
+                  path = [ config.services.k3s.package ];
+                  serviceConfig = {
+                    Type = "oneshot";
+                    RemainAfterExit = true;
+                  };
+                  script = ''
+                    export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+                    until k3s kubectl get --raw /readyz >/dev/null 2>&1; do sleep 5; done
+                    k3s kubectl create namespace monitoring --dry-run=client -o yaml \
+                      | k3s kubectl apply -f -
+                    k3s kubectl -n monitoring create secret generic alertmanager-smtp \
+                      --from-file=password=${config.clan.core.vars.generators.alertmanager-smtp.files."password".path} \
                       --dry-run=client -o yaml | k3s kubectl apply -f -
                   '';
                 };
@@ -253,6 +287,39 @@
                     # every node.
                     kubeProxy:
                       enabled: false
+
+                    # Email alerts to aodhan.hayter@gmail.com via Gmail SMTP. The
+                    # app password is mounted from the alertmanager-smtp k8s Secret
+                    # (synced by the systemd oneshot above) and read by file — never
+                    # rendered into git/nix. Watchdog (always-firing heartbeat) is
+                    # routed to null so it doesn't email.
+                    alertmanager:
+                      alertmanagerSpec:
+                        secrets:
+                          - alertmanager-smtp
+                      config:
+                        global:
+                          smtp_smarthost: "smtp.gmail.com:587"
+                          smtp_from: aodhan.hayter@gmail.com
+                          smtp_auth_username: aodhan.hayter@gmail.com
+                          smtp_auth_password_file: /etc/alertmanager/secrets/alertmanager-smtp/password
+                          smtp_require_tls: true
+                        route:
+                          group_by: [alertname]
+                          group_wait: 30s
+                          group_interval: 5m
+                          repeat_interval: 4h
+                          receiver: email-aodhan
+                          routes:
+                            - matchers:
+                                - 'alertname = "Watchdog"'
+                              receiver: "null"
+                        receivers:
+                          - name: "null"
+                          - name: email-aodhan
+                            email_configs:
+                              - to: aodhan.hayter@gmail.com
+                                send_resolved: true
                   '';
                 };
               }
