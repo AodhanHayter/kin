@@ -41,6 +41,11 @@
       tags = [ "k3s-agent" ];
       deploy.targetHost = "root@lenny.local";
     };
+    # Intel MacBookPro11,5 — non-EQ13, joins the LAN over broadcom wifi (kin/wifi).
+    mbp = {
+      tags = [ "k3s-agent" ];
+      deploy.targetHost = "root@mbp.local";
+    };
   };
 
   # Register kin's own clan.service modules so instances can select them with
@@ -58,6 +63,7 @@
     "kin/cloudflared" = ./modules/services/cloudflared;
     "kin/hello" = ./modules/services/hello;
     "kin/comin" = ./modules/services/comin;
+    "kin/wifi" = ./modules/services/wifi;
   };
 
   inventory.instances = {
@@ -182,6 +188,15 @@
         input = "self";
       };
       roles.default.machines.lenny = { };
+    };
+
+    # ---- declarative wifi for the ethernet-less mbp MacBookPro (mbp only) ----
+    wifi = {
+      module = {
+        name = "kin/wifi";
+        input = "self";
+      };
+      roles.default.machines.mbp = { };
     };
 
     # ---- ARC GitHub Actions runners (server only) ----

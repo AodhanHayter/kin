@@ -9,6 +9,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Apple hardware support for the mbp node (MacBookPro11,5): mbpfan, Intel
+    # microcode, SSD trim, broadcom firmware. See modules/hardware/macbook-pro-11-5.
+    nixos-hardware = {
+      url = "github:nixos/nixos-hardware";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # GitOps pull-deploy (kin/comin). Module isn't in nixpkgs; comes from here.
     comin = {
       url = "github:nlewo/comin";
@@ -33,6 +40,42 @@
       ];
       forAllSystems = nixpkgs.lib.genAttrs adminSystems;
 
+      # Shared bootstrap-installer config (key-only root sshd + mDNS + git +
+      # flakes). Used by both the generic `installer` and the `installer-mac`
+      # variant that adds broadcom wifi for the MacBookPro node.
+      installerCommon =
+        {
+          modulesPath,
+          pkgs,
+          ...
+        }:
+        {
+          imports = [ (modulesPath + "/installer/cd-dvd/installation-cd-minimal.nix") ];
+
+          services.openssh = {
+            enable = true;
+            settings.PermitRootLogin = "prohibit-password";
+          };
+          users.users.root.openssh.authorizedKeys.keys = import ./modules/ssh-keys.nix;
+
+          # mDNS so the installer resolves by name without hunting the IP.
+          services.avahi = {
+            enable = true;
+            nssmdns4 = true;
+            publish = {
+              enable = true;
+              addresses = true;
+              workstation = true;
+            };
+          };
+
+          nix.settings.experimental-features = [
+            "nix-command"
+            "flakes"
+          ];
+          environment.systemPackages = with pkgs; [ git ];
+        };
+
       # The whole clan — meta, machines, tags and service instances — lives in
       # ./clan.nix (the clan.lol native layout). flake.nix only wires it up and
       # adds the bootstrap installer ISO. No snowfall-style lib, no per-machine
@@ -52,41 +95,26 @@
         installer = nixpkgs.lib.nixosSystem {
           inherit system;
           modules = [
-            (
-              {
-                modulesPath,
-                pkgs,
-                ...
-              }:
-              {
-                imports = [ (modulesPath + "/installer/cd-dvd/installation-cd-minimal.nix") ];
+            installerCommon
+            { networking.hostName = "kin-installer"; }
+          ];
+        };
 
-                networking.hostName = "kin-installer";
-
-                services.openssh = {
-                  enable = true;
-                  settings.PermitRootLogin = "prohibit-password";
-                };
-                users.users.root.openssh.authorizedKeys.keys = import ./modules/ssh-keys.nix;
-
-                # mDNS so `kin-installer.local` resolves without hunting the IP.
-                services.avahi = {
-                  enable = true;
-                  nssmdns4 = true;
-                  publish = {
-                    enable = true;
-                    addresses = true;
-                    workstation = true;
-                  };
-                };
-
-                nix.settings.experimental-features = [
-                  "nix-command"
-                  "flakes"
-                ];
-                environment.systemPackages = with pkgs; [ git ];
-              }
-            )
+        # MacBookPro bootstrap ISO: the generic installer plus the
+        # macbook-pro-11-5 hardware module (broadcom `wl` driver + firmware) and
+        # iwd, so a Mac with no ethernet can join wifi from its own console
+        # before install:  iwctl station wlan0 connect <SSID>
+        installer-mac = nixpkgs.lib.nixosSystem {
+          inherit system;
+          specialArgs = { inherit inputs; };
+          modules = [
+            installerCommon
+            ./modules/hardware/macbook-pro-11-5
+            {
+              networking.hostName = "kin-installer-mac";
+              networking.wireless.iwd.enable = true;
+              nixpkgs.config.allowUnfree = true;
+            }
           ];
         };
       };
