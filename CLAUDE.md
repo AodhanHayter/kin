@@ -2,12 +2,13 @@
 
 Guidance for working in this repo. **kin** is a [clan](https://clan.lol)-managed
 NixOS cluster: three x86_64-linux Beelink EQ13 boxes (atlas, apollo, hermes)
-plus `lenny` (a non-EQ13 Lenovo box), running k3s + Longhorn + tailscale.
+plus two non-EQ13 boxes — `lenny` (Lenovo) and `mbp` (Intel MacBookPro11,5,
+joins via USB-ethernet tagged onto the cluster VLAN) — running k3s + Longhorn + tailscale.
 Homelab / learning cluster — treat it as a blank slate (nothing in it is
 precious), optimised for staying consistent with upstream clan.lol conventions.
 
 - **Stack:** clan-core 25.11 (`clan-core.lib.clan` wrapper), nixpkgs nixos-25.11, both pinned in `flake.nix`.
-- **Topology:** atlas = k3s **server** (`clusterInit`, embedded etcd); apollo/hermes/lenny = k3s **agents**. The agent join address is **derived** from the inventory (the single `k3s-server`-tagged machine), not hardcoded.
+- **Topology:** atlas = k3s **server** (`clusterInit`, embedded etcd); apollo/hermes/lenny/mbp = k3s **agents**. The agent join address is **derived** from the inventory (the single `k3s-server`-tagged machine), not hardcoded.
 - **Architecture:** 100% clan-native. Every capability is a `clan.service` deployed by `inventory.instances`; roles are filled by machine **tags**. There is **no** snowfall-style toggle layer, no `kin` lib, no suites/roles-via-imports.
 
 ## Layout & how it composes
@@ -116,7 +117,7 @@ only see tracked files).
 
 ```bash
 devenv shell                          # provides `clan`
-clan machines list                    # → atlas / apollo / hermes / lenny
+clan machines list                    # → atlas / apollo / hermes / lenny / mbp
 clan machines update atlas            # in-place nixos-rebuild switch over root@; NON-destructive
 clan vars list atlas                  # show vars for a machine
 clan vars get atlas k3s-token/token   # decrypt a var: <machine> <generator>/<file>
