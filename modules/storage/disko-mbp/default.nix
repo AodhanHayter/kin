@@ -1,8 +1,8 @@
 # mbp disk layout — Intel MacBookPro11,5, single internal SSD, UEFI/systemd-boot.
 # Load-bearing like disko-lenny: no fileSystems exist anywhere else, disko
 # generates every mount. Single disk → ESP + swap + root (ext4, rest). No
-# dedicated Longhorn partition: mbp joins over wifi and is a compute agent, not a
-# Longhorn storage replica (replicating volumes over wifi is a bad idea).
+# dedicated Longhorn partition: mbp is a laptop compute agent, not a Longhorn
+# storage replica, so root gets the whole disk.
 #
 # Device id read off the live install (the internal 512G Apple SSD).
 {
