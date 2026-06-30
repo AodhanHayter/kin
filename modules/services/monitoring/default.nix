@@ -140,6 +140,34 @@
                       --dry-run=client -o yaml | k3s kubectl apply -f -
                   '';
                 };
+                # Garage S3 creds for Loki chunk storage. Same shared
+                # garage-backup-key as Longhorn/etcd; Loki reads them from env
+                # (singleBinary.extraEnvFrom) so they never enter the nix store.
+                loki-s3-secret = {
+                  description = "Sync Garage S3 credentials into the loki-s3 k8s Secret";
+                  wantedBy = [ "multi-user.target" ];
+                  after = [ "k3s.service" ];
+                  wants = [ "k3s.service" ];
+                  path = [ config.services.k3s.package ];
+                  serviceConfig = {
+                    Type = "oneshot";
+                    RemainAfterExit = true;
+                  };
+                  script = ''
+                    export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+                    until k3s kubectl get --raw /readyz >/dev/null 2>&1; do sleep 5; done
+                    k3s kubectl create namespace monitoring --dry-run=client -o yaml \
+                      | k3s kubectl apply -f -
+                    k3s kubectl -n monitoring create secret generic loki-s3 \
+                      --from-file=AWS_ACCESS_KEY_ID=${
+                        config.clan.core.vars.generators.garage-backup-key.files."access-key-id".path
+                      } \
+                      --from-file=AWS_SECRET_ACCESS_KEY=${
+                        config.clan.core.vars.generators.garage-backup-key.files."secret-access-key".path
+                      } \
+                      --dry-run=client -o yaml | k3s kubectl apply -f -
+                  '';
+                };
               };
 
             services.k3s.manifests.monitoring.content = [
@@ -175,6 +203,14 @@
                       # RWO Longhorn PVC — RollingUpdate would deadlock on multi-attach.
                       deploymentStrategy:
                         type: Recreate
+                      # Loki logs alongside the Prometheus metrics datasource.
+                      # Single-binary Loki Service in the same namespace.
+                      additionalDataSources:
+                        - name: Loki
+                          type: loki
+                          uid: loki
+                          access: proxy
+                          url: http://loki.monitoring.svc.cluster.local:3100
 
                     prometheus:
                       ingress:
@@ -329,6 +365,167 @@
                             email_configs:
                               - to: aodhan.hayter@gmail.com
                                 send_resolved: true
+                  '';
+                };
+              }
+            ];
+
+            # Logs: single-binary Loki (chunks -> Garage S3) + an Alloy DaemonSet
+            # tailing every node's /var/log/pods into it. Grafana picks it up via
+            # the Loki datasource added above. Deployed into the monitoring ns.
+            services.k3s.manifests.logging.content = [
+              {
+                apiVersion = "helm.cattle.io/v1";
+                kind = "HelmChart";
+                metadata = {
+                  name = "loki";
+                  namespace = "kube-system";
+                };
+                spec = {
+                  repo = "https://grafana-community.github.io/helm-charts";
+                  chart = "loki";
+                  version = "18.2.0";
+                  targetNamespace = "monitoring";
+                  valuesContent = ''
+                    deploymentMode: Monolithic
+                    loki:
+                      auth_enabled: false
+                      commonConfig:
+                        replication_factor: 1
+                      schemaConfig:
+                        configs:
+                          - from: "2024-04-01"
+                            store: tsdb
+                            object_store: s3
+                            schema: v13
+                            index:
+                              prefix: loki_index_
+                              period: 24h
+                      limits_config:
+                        retention_period: 336h
+                      compactor:
+                        retention_enabled: true
+                        delete_request_store: s3
+                      storage:
+                        type: s3
+                        bucketNames:
+                          chunks: loki-chunks
+                          ruler: loki-chunks
+                          admin: loki-chunks
+                        s3:
+                          endpoint: http://10.10.3.42:3900
+                          region: garage
+                          s3ForcePathStyle: true
+                          insecure: true
+                          # accessKeyId/secretAccessKey left unset — the AWS SDK
+                          # reads AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY from the
+                          # loki-s3 secret (extraEnvFrom below), so creds never
+                          # enter the world-readable nix store.
+                    singleBinary:
+                      replicas: 1
+                      extraEnvFrom:
+                        - secretRef:
+                            name: loki-s3
+                      persistence:
+                        enabled: true
+                        storageClass: longhorn
+                        size: 10Gi
+                    # Memcached caches default ON; chunksCache alone requests ~8 GB.
+                    # Far too heavy for a homelab and unneeded for log search.
+                    chunksCache:
+                      enabled: false
+                    resultsCache:
+                      enabled: false
+                    # nginx gateway, canary DaemonSet, helm-test pod, bundled minio
+                    # all unneeded — Grafana/Alloy hit the loki Service directly.
+                    gateway:
+                      enabled: false
+                    lokiCanary:
+                      enabled: false
+                    test:
+                      enabled: false
+                    minio:
+                      enabled: false
+                    # Monolithic mode: zero the scalable/distributed components.
+                    backend:
+                      replicas: 0
+                    read:
+                      replicas: 0
+                    write:
+                      replicas: 0
+                  '';
+                };
+              }
+              {
+                apiVersion = "helm.cattle.io/v1";
+                kind = "HelmChart";
+                metadata = {
+                  name = "alloy";
+                  namespace = "kube-system";
+                };
+                spec = {
+                  repo = "https://grafana.github.io/helm-charts";
+                  chart = "alloy";
+                  version = "1.10.0";
+                  targetNamespace = "monitoring";
+                  # DaemonSet mounts the node's /var/log; the config discovers
+                  # pods, builds /var/log/pods file targets, tails them (no
+                  # apiserver load) and pushes to the loki Service. No node
+                  # filter needed — pod log files are node-local, so each Alloy
+                  # only finds its own node's logs (no duplicates).
+                  valuesContent = ''
+                    controller:
+                      type: daemonset
+                    alloy:
+                      mounts:
+                        varlog: true
+                      configMap:
+                        content: |-
+                          discovery.kubernetes "pod" {
+                            role = "pod"
+                          }
+
+                          discovery.relabel "pod_logs" {
+                            targets = discovery.kubernetes.pod.targets
+                            rule {
+                              source_labels = ["__meta_kubernetes_namespace"]
+                              action        = "replace"
+                              target_label  = "namespace"
+                            }
+                            rule {
+                              source_labels = ["__meta_kubernetes_pod_name"]
+                              action        = "replace"
+                              target_label  = "pod"
+                            }
+                            rule {
+                              source_labels = ["__meta_kubernetes_pod_container_name"]
+                              action        = "replace"
+                              target_label  = "container"
+                            }
+                            rule {
+                              source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+                              action        = "replace"
+                              target_label  = "app"
+                            }
+                            rule {
+                              source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
+                              action        = "replace"
+                              target_label  = "__path__"
+                              separator     = "/"
+                              replacement   = "/var/log/pods/*$1/*.log"
+                            }
+                          }
+
+                          loki.source.file "pod_logs" {
+                            targets    = discovery.relabel.pod_logs.output
+                            forward_to = [loki.write.default.receiver]
+                          }
+
+                          loki.write "default" {
+                            endpoint {
+                              url = "http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push"
+                            }
+                          }
                   '';
                 };
               }

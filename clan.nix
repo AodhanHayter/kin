@@ -63,6 +63,7 @@
     "kin/cloudflared" = ./modules/services/cloudflared;
     "kin/hello" = ./modules/services/hello;
     "kin/comin" = ./modules/services/comin;
+    "kin/cnpg" = ./modules/services/cnpg;
   };
 
   inventory.instances = {
@@ -175,6 +176,15 @@
     monitoring = {
       module = {
         name = "kin/monitoring";
+        input = "self";
+      };
+      roles.default.tags.k3s-server = { };
+    };
+
+    # ---- CloudNativePG operator: on-demand Postgres (server only) ----
+    cnpg = {
+      module = {
+        name = "kin/cnpg";
         input = "self";
       };
       roles.default.tags.k3s-server = { };

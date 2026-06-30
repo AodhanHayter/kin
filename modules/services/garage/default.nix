@@ -112,7 +112,7 @@
                 garage key info "$access" >/dev/null 2>&1 \
                   || garage key import --yes -n kin-backup "$access" "$secret"
 
-                for bucket in longhorn-backups etcd-snapshots; do
+                for bucket in longhorn-backups etcd-snapshots loki-chunks cnpg-backups; do
                   garage bucket info "$bucket" >/dev/null 2>&1 \
                     || garage bucket create "$bucket"
                   garage bucket allow "$bucket" --read --write --key "$access"
