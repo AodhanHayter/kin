@@ -516,8 +516,15 @@
                             }
                           }
 
+                          // file_match expands the /var/log/pods/*<uid>/<container>/*.log
+                          // glob in __path__ into concrete files; loki.source.file
+                          // tails literal paths and won't glob on its own.
+                          local.file_match "pod_logs" {
+                            path_targets = discovery.relabel.pod_logs.output
+                          }
+
                           loki.source.file "pod_logs" {
-                            targets    = discovery.relabel.pod_logs.output
+                            targets    = local.file_match.pod_logs.targets
                             forward_to = [loki.write.default.receiver]
                           }
 
