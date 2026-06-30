@@ -193,6 +193,11 @@ clan vars generate                    # (re)mint vars; needs admin age key prese
   options exist.
 - **Change where a service runs:** edit the instance's role `tags`/`machines` in
   `clan.nix` — the machine tags are the single source of truth.
+- **Pin Helm chart versions + values from source, not memory/search:**
+  `curl -fsSL <repo>/index.yaml | grep -A2 '^  <chart>:'` for the real version,
+  and `curl` the chart's `values.yaml` to confirm value keys before writing
+  `valuesContent` — artifacthub/web search lag releases, and a wrong version/key
+  fails silently in the `helm-install-<name>` job, never at `nix eval`.
 
 ## Hard rules
 
@@ -240,3 +245,18 @@ clan machines list                    # clan sees the machines
 On a node (as root): `k3s kubectl get nodes` (use `k3s kubectl`, not bare
 `kubectl` — kubeconfig is at `/etc/rancher/k3s/k3s.yaml`); Longhorn:
 `k3s kubectl -n longhorn-system get pods`.
+
+**From the Mac (no ssh):** `kubectl` is on PATH with context `kin` →
+`kubectl -n <ns> get pods` reaches the cluster directly.
+
+**Verify an in-cluster Helm deploy** (after `git push`, comin auto-applies in
+~60s): `kubectl -n kube-system get helmchart` shows the chart; a stuck/failed
+install surfaces in `kubectl -n kube-system get pods | grep helm-install-<name>`
+(read its logs — helm-controller failures are otherwise quiet). Probe a ClusterIP
+service from a throwaway pod: `kubectl -n <ns> run t --rm -i --restart=Never
+--image=curlimages/curl:8.11.1 --command -- sh -c 'curl -s <url>'`.
+
+**kube-prometheus-stack Grafana:** datasource/value-only changes do NOT roll the
+grafana pod (provisioning loads at startup) → after such a change run
+`kubectl -n monitoring rollout restart deploy kube-prometheus-stack-grafana`.
+Admin creds: `clan vars get atlas grafana-admin/password` (user `admin`).
