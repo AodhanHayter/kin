@@ -126,9 +126,11 @@
         name = "sshd";
         input = "clan-core";
       };
-      # Flat .local LAN reached by mDNS name — leave certificate.searchDomains
-      # empty (the default) so no CA host certs are generated.
+      # Flat .local LAN reached by mDNS name — no CA host certs wanted. In 26.05
+      # `certificate.enable` defaults to true, so turn it off explicitly (also
+      # skips the openssh-ca vars generator).
       roles.server.tags.all = { };
+      roles.server.settings.certificate.enable = false;
     };
 
     # ---- upstream prebuilt: trust the clan.lol + nix-community caches ----

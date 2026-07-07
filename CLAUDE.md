@@ -7,7 +7,7 @@ joins via USB-ethernet tagged onto the cluster VLAN) — running k3s + Longhorn 
 Homelab / learning cluster — treat it as a blank slate (nothing in it is
 precious), optimised for staying consistent with upstream clan.lol conventions.
 
-- **Stack:** clan-core 25.11 (`clan-core.lib.clan` wrapper), nixpkgs nixos-25.11, both pinned in `flake.nix`.
+- **Stack:** clan-core 26.05 (`clan-core.lib.clan` wrapper), pinned in `flake.nix`; nixpkgs `follows = "clan-core/nixpkgs"` (nixos-26.05 — matches what clan-core was tested against, no independent channel pin).
 - **Topology:** atlas = k3s **server** (`clusterInit`, embedded etcd); apollo/hermes/lenny/mbp = k3s **agents**. The agent join address is **derived** from the inventory (the single `k3s-server`-tagged machine), not hardcoded.
 - **Architecture:** 100% clan-native. Every capability is a `clan.service` deployed by `inventory.instances`; roles are filled by machine **tags**. There is **no** snowfall-style toggle layer, no `kin` lib, no suites/roles-via-imports.
 
@@ -60,7 +60,7 @@ clan-core for flake outputs).
 ## Authoring a clan.service module
 
 Custom services are `_class = "clan.service"` modules (see
-<https://clan.lol/docs/25.11/services/definition>). Skeleton:
+<https://clan.lol/docs/26.05/services/definition>). Skeleton:
 
 ```nix
 { ... }:
@@ -101,7 +101,7 @@ only see tracked files).
 - **Settings must be serializable** (they round-trip through inventory). Expose
   plain data via `interface.options`; keep functions/derivations inside
   `perInstance`/`perMachine`.
-- **clan-core 25.11 gotchas** (the pinned version is older than `../clan-core`'s
+- **clan-core 26.05 gotchas** (the pinned version is older than `../clan-core`'s
   `main`; verify against the pinned store path, not the checkout):
   - `manifest.categories` is a fixed enum (Audio/AudioVideo/Desktop/Development/
     Education/Game/Graphics/Network/Office/Science/Settings/Social/System/
@@ -110,8 +110,10 @@ only see tracked files).
     one machine, not by a constraint.
   - the prebuilt `users` service manages only account/password/groups — **no**
     `openssh`/uid/shell options; supply those via `roles.*.extraModules`.
-  - the prebuilt `sshd` service has **no** `certificate.enable`; the CA cert is
-    gated by `certificate.searchDomains` (default `[]` → no cert).
+  - the prebuilt `sshd` service's `certificate.enable` now defaults to **true**
+    (26.05 flip; issues CA-signed host certs off the clan internal domain). kin
+    sets `certificate.enable = false` on the sshd instance (flat `.local` mDNS
+    LAN, no certs wanted) — which also skips the `openssh-ca` vars generator.
 
 ## clan workflow (inside `devenv shell`)
 

@@ -34,7 +34,8 @@
         nixosModule =
           { config, ... }:
           {
-            services.harmonia = {
+            # 26.05 nixpkgs moved these under `services.harmonia.cache.*`.
+            services.harmonia.cache = {
               enable = true;
               signKeyPaths = [ config.clan.core.vars.generators.nix-cache-key.files."sign-key".path ];
               settings.priority = settings.priority;

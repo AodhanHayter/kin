@@ -2,12 +2,14 @@
   description = "kin: clan-managed k3s cluster (atlas/apollo/hermes/lenny)";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
-
     clan-core = {
-      url = "https://git.clan.lol/clan/clan-core/archive/25.11.tar.gz";
-      inputs.nixpkgs.follows = "nixpkgs";
+      url = "https://git.clan.lol/clan/clan-core/archive/26.05.tar.gz";
     };
+
+    # Track exactly the nixpkgs clan-core 26.05 was tested against (upgrade doc
+    # recommends `nixpkgs.follows = "clan-core/nixpkgs"`), instead of an
+    # independent nixos-* channel pin that could drift from clan-core's.
+    nixpkgs.follows = "clan-core/nixpkgs";
 
     # Apple hardware support for the mbp node (MacBookPro11,5): mbpfan, Intel
     # microcode, SSD trim, broadcom firmware. See modules/hardware/macbook-pro-11-5.
@@ -122,6 +124,8 @@
       clan = clan.config;
 
       # The dev shell lives in devenv.nix (devenv.sh), not here.
-      formatter = forAllSystems (s: nixpkgs.legacyPackages.${s}.nixfmt-rfc-style);
+      # 26.05: `nixfmt` IS the rfc-style formatter now (nixfmt-rfc-style is a
+      # deprecated alias).
+      formatter = forAllSystems (s: nixpkgs.legacyPackages.${s}.nixfmt);
     };
 }
