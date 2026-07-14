@@ -108,6 +108,12 @@
                       persistence:
                         defaultClass: true
                         defaultClassReplicaCount: 3
+                      csi:
+                        # Skip driver-deployer's proc-cmdline auto-detection pod: its
+                        # create/delete cycle races on container restart (fixed pod
+                        # name + async delete), which crashloops the deployer forever
+                        # once the detection pod gets stuck (e.g. on a dead node).
+                        kubeletRootDir: /var/lib/kubelet
                     '';
                   };
                 }
