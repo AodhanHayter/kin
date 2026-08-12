@@ -64,6 +64,7 @@
     "kin/hello" = ./modules/services/hello;
     "kin/comin" = ./modules/services/comin;
     "kin/cnpg" = ./modules/services/cnpg;
+    "kin/gen3" = ./modules/services/gen3;
   };
 
   inventory.instances = {
@@ -187,6 +188,15 @@
     cnpg = {
       module = {
         name = "kin/cnpg";
+        input = "self";
+      };
+      roles.default.tags.k3s-server = { };
+    };
+
+    # ---- Gen3 data-commons lab: dev mode, mock auth, LAN-only (server only) ----
+    gen3 = {
+      module = {
+        name = "kin/gen3";
         input = "self";
       };
       roles.default.tags.k3s-server = { };
