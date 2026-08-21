@@ -37,7 +37,10 @@
             ...
           }:
           let
-            chartVersion = "0.1.2";
+            chartVersion = "0.1.3";
+            # Immutable image pin from the v0.1.3 release workflow; update
+            # together with chartVersion.
+            imageDigest = "sha256:294def3cd935d549f9d4a77ec3562ec5831ea5512489d33f76a04f2a6ddabb82";
             atlasIp = "10.10.3.100";
             # Release name is the HelmChart CR name ("fissio"); the chart's
             # fullname helper prefixes it, so in-cluster services are
@@ -113,6 +116,8 @@
                   # namespace (kube-system) and is synced by fissio-secrets.
                   dockerRegistrySecret.name = "fissio-chart-auth";
                   valuesContent = ''
+                    image:
+                      digest: ${imageDigest}
                     fissio:
                       host: fissio.local
                       # http: LAN-only demo — traefik's default cert is
