@@ -65,6 +65,7 @@
     "kin/comin" = ./modules/services/comin;
     "kin/cnpg" = ./modules/services/cnpg;
     "kin/gen3" = ./modules/services/gen3;
+    "kin/fissio" = ./modules/services/fissio;
   };
 
   inventory.instances = {
@@ -197,6 +198,15 @@
     gen3 = {
       module = {
         name = "kin/gen3";
+        input = "self";
+      };
+      roles.default.tags.k3s-server = { };
+    };
+
+    # ---- Fissio data-commons platform (server applies chart + secrets) ----
+    fissio = {
+      module = {
+        name = "kin/fissio";
         input = "self";
       };
       roles.default.tags.k3s-server = { };
