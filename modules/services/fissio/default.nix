@@ -37,7 +37,7 @@
             ...
           }:
           let
-            chartVersion = "0.1.1";
+            chartVersion = "0.1.2";
             atlasIp = "10.10.3.100";
             # Release name is the HelmChart CR name ("fissio"); the chart's
             # fullname helper prefixes it, so in-cluster services are
