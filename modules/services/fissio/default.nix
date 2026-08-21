@@ -37,15 +37,16 @@
             ...
           }:
           let
-            chartVersion = "0.1.3";
-            # Immutable image pin from the v0.1.3 release workflow; update
+            chartVersion = "0.1.4";
+            # Immutable image pin from the v0.1.4 release workflow; update
             # together with chartVersion.
-            imageDigest = "sha256:294def3cd935d549f9d4a77ec3562ec5831ea5512489d33f76a04f2a6ddabb82";
+            imageDigest = "sha256:34ef327656cf92e1e9b8aeb915ae3d1bd104dd3c785b616771e9b6c9b061bc1f";
             atlasIp = "10.10.3.100";
             # Release name is the HelmChart CR name ("fissio"); the chart's
             # fullname helper prefixes it, so in-cluster services are
             # fissio-fissio{,-postgres,-dex,-garage}.
             envGen = config.clan.core.vars.generators.fissio-env;
+            demoGen = config.clan.core.vars.generators.fissio-demo;
           in
           {
             # GHCR pull token — consumed only here (server), so scoped to the
@@ -82,6 +83,29 @@
               '';
             };
 
+            # Demo-profile credentials (chart >= 0.1.4 carries none itself):
+            # Dex client secret, one bcrypt-hashed password shared by the demo
+            # accounts (plaintext retrievable via
+            # `clan vars get atlas fissio-demo/dex-password`), and the Garage
+            # RPC secret.
+            clan.core.vars.generators.fissio-demo = {
+              files."dex-client-secret".secret = true;
+              files."dex-password".secret = true;
+              files."dex-password-hash".secret = true;
+              files."garage-rpc-secret".secret = true;
+              runtimeInputs = [
+                pkgs.openssl
+                pkgs.mkpasswd
+              ];
+              script = ''
+                openssl rand -hex 32 | tr -d '\n' > "$out"/dex-client-secret
+                pw=$(openssl rand -base64 12 | tr -d '\n')
+                printf '%s' "$pw" > "$out"/dex-password
+                printf '%s' "$pw" | mkpasswd -m bcrypt -R 10 -s | tr -d '\n' > "$out"/dex-password-hash
+                openssl rand -hex 32 | tr -d '\n' > "$out"/garage-rpc-secret
+              '';
+            };
+
             services.k3s.manifests.fissio.content = [
               # Cluster-DNS pin for the mDNS hostnames (see header). A .server
               # import adds separate zone blocks, so it cannot collide with the
@@ -115,6 +139,9 @@
                   # Private OCI registry; the secret must live in this CR's
                   # namespace (kube-system) and is synced by fissio-secrets.
                   dockerRegistrySecret.name = "fissio-chart-auth";
+                  # Homelab profile, inlined: HelmChart CRs cannot reference
+                  # the chart's values-homelab.yaml, so keep this in sync with
+                  # it (deploy/README.md in the fissio repo).
                   valuesContent = ''
                     image:
                       digest: ${imageDigest}
@@ -124,8 +151,33 @@
                       # self-signed, and Fissio's JWKS fetch would reject it.
                       oidcIssuer: http://dex.local/dex
                       objectStoreEndpoint: http://fissio-fissio-garage:3900
+                    demo:
+                      enabled: true
+                    postgres:
+                      enabled: true
                     dex:
+                      enabled: true
                       host: dex.local
+                      existingSecret: fissio-demo
+                      enablePasswordDB: true
+                      staticPasswords:
+                        - email: ada@hitech.example
+                          username: ada
+                          userID: 08a8684b-db88-4b73-90a9-3cd1661f5466
+                          hashFromEnv: DEX_PASSWORD_HASH
+                        - email: hr@hitech.example
+                          username: hr
+                          userID: 41331323-6f44-45e6-b3b9-2c4b60c02be5
+                          hashFromEnv: DEX_PASSWORD_HASH
+                        - email: guest@hitech.example
+                          username: guest
+                          userID: 7f38a8d3-3f9c-4c22-8b7d-1f24d6a2c001
+                          hashFromEnv: DEX_PASSWORD_HASH
+                    garage:
+                      enabled: true
+                      existingSecret: fissio-demo
+                    ingress:
+                      enabled: true
                   '';
                 };
               }
@@ -183,6 +235,13 @@
                       --from-file=POSTGRES_PASSWORD=${envGen.files."postgres-password".path} \
                       --from-file=OBJECT_STORE_ACCESS_KEY_ID=${envGen.files."object-store-access-key-id".path} \
                       --from-file=OBJECT_STORE_SECRET_ACCESS_KEY=${envGen.files."object-store-secret-access-key".path} \
+                      --dry-run=client -o yaml | k3s kubectl apply -f -
+
+                    # Demo-profile credentials for bundled Dex and Garage.
+                    k3s kubectl -n fissio create secret generic fissio-demo \
+                      --from-file=DEX_CLIENT_SECRET=${demoGen.files."dex-client-secret".path} \
+                      --from-file=DEX_PASSWORD_HASH=${demoGen.files."dex-password-hash".path} \
+                      --from-file=GARAGE_RPC_SECRET=${demoGen.files."garage-rpc-secret".path} \
                       --dry-run=client -o yaml | k3s kubectl apply -f -
 
                     # GHCR auth, twice: pods pull the image from the app
