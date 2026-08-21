@@ -111,7 +111,7 @@
                   targetNamespace = "fissio";
                   # Private OCI registry; the secret must live in this CR's
                   # namespace (kube-system) and is synced by fissio-secrets.
-                  dockerRegistrySecret = "fissio-chart-auth";
+                  dockerRegistrySecret.name = "fissio-chart-auth";
                   valuesContent = ''
                     fissio:
                       host: fissio.local
