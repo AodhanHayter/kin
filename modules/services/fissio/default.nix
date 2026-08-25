@@ -13,10 +13,6 @@
 # Pods can't resolve mDNS names, and Fissio must fetch JWKS from the Dex
 # issuer, so a coredns-custom server block pins both names to atlas in
 # cluster DNS too.
-#
-# After first deploy (one time): run the Garage layout/bucket/key seed steps
-# from deploy/README.md, using the object-store key minted by the fissio-env
-# generator (`clan vars get atlas fissio-env/object-store-access-key-id`).
 { ... }:
 {
   _class = "clan.service";
@@ -37,16 +33,80 @@
             ...
           }:
           let
-            chartVersion = "0.1.4";
+            chartVersion = "0.1.5";
             # Immutable image pin from the v0.1.4 release workflow; update
             # together with chartVersion.
-            imageDigest = "sha256:34ef327656cf92e1e9b8aeb915ae3d1bd104dd3c785b616771e9b6c9b061bc1f";
+            imageDigest = "sha256:4f532506125c5503c8254d4fc4bcdcd4f488d7c4e30afe39d7c4c30346660ebb";
             atlasIp = "10.10.3.100";
             # Release name is the HelmChart CR name ("fissio"); the chart's
             # fullname helper prefixes it, so in-cluster services are
             # fissio-fissio{,-postgres,-dex,-garage}.
             envGen = config.clan.core.vars.generators.fissio-env;
             demoGen = config.clan.core.vars.generators.fissio-demo;
+            # Rendered ahead of time and applied by fissio-secrets, after the
+            # namespace + pull secrets it depends on — never through k3s'
+            # manifests auto-deploy, which would race helm-controller against
+            # fissio-secrets creating them.
+            fissioHelmChart = pkgs.writeText "fissio-helmchart.json" (
+              builtins.toJSON {
+                apiVersion = "helm.cattle.io/v1";
+                kind = "HelmChart";
+                metadata = {
+                  name = "fissio";
+                  namespace = "kube-system";
+                };
+                spec = {
+                  chart = "oci://ghcr.io/fissioai/charts/fissio";
+                  version = chartVersion;
+                  targetNamespace = "fissio";
+                  # Private OCI registry; the secret must live in this CR's
+                  # namespace (kube-system) and is synced by fissio-secrets.
+                  dockerRegistrySecret.name = "fissio-chart-auth";
+                  # Homelab profile, inlined: HelmChart CRs cannot reference
+                  # the chart's values-homelab.yaml, so keep this in sync with
+                  # it (deploy/README.md in the fissio repo).
+                  valuesContent = ''
+                    image:
+                      digest: ${imageDigest}
+                    fissio:
+                      host: fissio.local
+                      # http: LAN-only demo — traefik's default cert is
+                      # self-signed, and Fissio's JWKS fetch would reject it.
+                      oidcIssuer: http://dex.local/dex
+                      objectStoreEndpoint: http://fissio-fissio-garage:3900
+                    demo:
+                      enabled: true
+                      bootstrap: true
+                      seedData: true
+                    postgres:
+                      enabled: true
+                    dex:
+                      enabled: true
+                      host: dex.local
+                      existingSecret: fissio-demo
+                      enablePasswordDB: true
+                      staticPasswords:
+                        - email: ada@hitech.example
+                          username: ada
+                          userID: 08a8684b-db88-4b73-90a9-3cd1661f5466
+                          hashFromEnv: DEX_PASSWORD_HASH
+                        - email: hr@hitech.example
+                          username: hr
+                          userID: 41331323-6f44-45e6-b3b9-2c4b60c02be5
+                          hashFromEnv: DEX_PASSWORD_HASH
+                        - email: guest@hitech.example
+                          username: guest
+                          userID: 7f38a8d3-3f9c-4c22-8b7d-1f24d6a2c001
+                          hashFromEnv: DEX_PASSWORD_HASH
+                    garage:
+                      enabled: true
+                      existingSecret: fissio-demo
+                    ingress:
+                      enabled: true
+                  '';
+                };
+              }
+            );
           in
           {
             # GHCR pull token — consumed only here (server), so scoped to the
@@ -125,62 +185,6 @@
                   }
                 '';
               }
-              {
-                apiVersion = "helm.cattle.io/v1";
-                kind = "HelmChart";
-                metadata = {
-                  name = "fissio";
-                  namespace = "kube-system";
-                };
-                spec = {
-                  chart = "oci://ghcr.io/fissioai/charts/fissio";
-                  version = chartVersion;
-                  targetNamespace = "fissio";
-                  # Private OCI registry; the secret must live in this CR's
-                  # namespace (kube-system) and is synced by fissio-secrets.
-                  dockerRegistrySecret.name = "fissio-chart-auth";
-                  # Homelab profile, inlined: HelmChart CRs cannot reference
-                  # the chart's values-homelab.yaml, so keep this in sync with
-                  # it (deploy/README.md in the fissio repo).
-                  valuesContent = ''
-                    image:
-                      digest: ${imageDigest}
-                    fissio:
-                      host: fissio.local
-                      # http: LAN-only demo — traefik's default cert is
-                      # self-signed, and Fissio's JWKS fetch would reject it.
-                      oidcIssuer: http://dex.local/dex
-                      objectStoreEndpoint: http://fissio-fissio-garage:3900
-                    demo:
-                      enabled: true
-                    postgres:
-                      enabled: true
-                    dex:
-                      enabled: true
-                      host: dex.local
-                      existingSecret: fissio-demo
-                      enablePasswordDB: true
-                      staticPasswords:
-                        - email: ada@hitech.example
-                          username: ada
-                          userID: 08a8684b-db88-4b73-90a9-3cd1661f5466
-                          hashFromEnv: DEX_PASSWORD_HASH
-                        - email: hr@hitech.example
-                          username: hr
-                          userID: 41331323-6f44-45e6-b3b9-2c4b60c02be5
-                          hashFromEnv: DEX_PASSWORD_HASH
-                        - email: guest@hitech.example
-                          username: guest
-                          userID: 7f38a8d3-3f9c-4c22-8b7d-1f24d6a2c001
-                          hashFromEnv: DEX_PASSWORD_HASH
-                    garage:
-                      enabled: true
-                      existingSecret: fissio-demo
-                    ingress:
-                      enabled: true
-                  '';
-                };
-              }
             ];
 
             # mDNS aliases so LAN browsers reach traefik on atlas — same
@@ -220,14 +224,25 @@
                   serviceConfig = {
                     Type = "oneshot";
                     RemainAfterExit = true;
+                    # A slow k3s start or a transient apply failure shouldn't
+                    # brick this unit; retry until it succeeds.
+                    Restart = "on-failure";
+                    RestartSec = 10;
+                    TimeoutStartSec = 0;
                   };
                   script = ''
+                    set -euo pipefail
                     export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+                    apply() { echo "fissio-secrets: applying $1"; }
+
                     until k3s kubectl get --raw /readyz >/dev/null 2>&1; do sleep 5; done
+
+                    apply namespace
                     k3s kubectl create namespace fissio --dry-run=client -o yaml \
                       | k3s kubectl apply -f -
 
                     # App env, consumed via the chart's existingSecret.
+                    apply fissio-env secret
                     k3s kubectl -n fissio create secret generic fissio-env \
                       --from-file=DATABASE_URL=${envGen.files."database-url".path} \
                       --from-file=WAREHOUSE_DATABASE_URL=${envGen.files."warehouse-database-url".path} \
@@ -238,6 +253,7 @@
                       --dry-run=client -o yaml | k3s kubectl apply -f -
 
                     # Demo-profile credentials for bundled Dex and Garage.
+                    apply fissio-demo secret
                     k3s kubectl -n fissio create secret generic fissio-demo \
                       --from-file=DEX_CLIENT_SECRET=${demoGen.files."dex-client-secret".path} \
                       --from-file=DEX_PASSWORD_HASH=${demoGen.files."dex-password-hash".path} \
@@ -248,14 +264,22 @@
                     # namespace; helm-controller pulls the chart from the CR's
                     # namespace (kube-system).
                     token=$(cat ${config.clan.core.vars.generators.ghcr-pull.files."token".path})
+                    apply ghcr-pull secret
                     k3s kubectl -n fissio create secret docker-registry ghcr-pull \
                       --docker-server=ghcr.io --docker-username=aodhanhayter \
                       --docker-password="$token" \
                       --dry-run=client -o yaml | k3s kubectl apply -f -
+                    apply fissio-chart-auth secret
                     k3s kubectl -n kube-system create secret docker-registry fissio-chart-auth \
                       --docker-server=ghcr.io --docker-username=aodhanhayter \
                       --docker-password="$token" \
                       --dry-run=client -o yaml | k3s kubectl apply -f -
+
+                    # HelmChart CR last: by now the namespace and both pull
+                    # secrets it needs already exist, so helm-controller
+                    # can't race fissio-secrets.
+                    apply fissio HelmChart
+                    k3s kubectl apply -f ${fissioHelmChart}
                   '';
                 };
               };
