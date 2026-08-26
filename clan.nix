@@ -68,6 +68,7 @@ in
     "kin/cloudflared" = ./modules/services/cloudflared;
     "kin/hello" = ./modules/services/hello;
     "kin/ipa-rfp-model" = ./modules/services/ipa-rfp-model;
+    "kin/kotaemon" = ./modules/services/kotaemon;
     "kin/comin" = ./modules/services/comin;
     "kin/cnpg" = ./modules/services/cnpg;
     "kin/gen3" = ./modules/services/gen3;
@@ -271,6 +272,15 @@ in
     ipa-rfp-model = {
       module = {
         name = "kin/ipa-rfp-model";
+        input = "self";
+      };
+      roles.default.tags.k3s-server = { };
+    };
+
+    # ---- kotaemon RAG UI behind the tunnel (server applies manifests) ----
+    kotaemon = {
+      module = {
+        name = "kin/kotaemon";
         input = "self";
       };
       roles.default.tags.k3s-server = { };
