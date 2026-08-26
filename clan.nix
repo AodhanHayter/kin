@@ -62,6 +62,7 @@
     "kin/attic" = ./modules/services/attic;
     "kin/cloudflared" = ./modules/services/cloudflared;
     "kin/hello" = ./modules/services/hello;
+    "kin/ipa-rfp-model" = ./modules/services/ipa-rfp-model;
     "kin/comin" = ./modules/services/comin;
     "kin/cnpg" = ./modules/services/cnpg;
     "kin/gen3" = ./modules/services/gen3;
@@ -243,6 +244,15 @@
     hello = {
       module = {
         name = "kin/hello";
+        input = "self";
+      };
+      roles.default.tags.k3s-server = { };
+    };
+
+    # ---- IPA RFP financial model behind the tunnel (server applies manifests) ----
+    ipa-rfp-model = {
+      module = {
+        name = "kin/ipa-rfp-model";
         input = "self";
       };
       roles.default.tags.k3s-server = { };
