@@ -66,7 +66,7 @@
     "kin/comin" = ./modules/services/comin;
     "kin/cnpg" = ./modules/services/cnpg;
     "kin/gen3" = ./modules/services/gen3;
-    "kin/fissio" = ./modules/services/fissio;
+    "kin/data-commons" = ./modules/services/data-commons;
   };
 
   inventory.instances = {
@@ -204,10 +204,10 @@
       roles.default.tags.k3s-server = { };
     };
 
-    # ---- Fissio data-commons platform (server applies chart + secrets) ----
-    fissio = {
+    # ---- data-commons platform (server applies chart + CNPG DB + secrets) ----
+    data-commons = {
       module = {
-        name = "kin/fissio";
+        name = "kin/data-commons";
         input = "self";
       };
       roles.default.tags.k3s-server = { };
