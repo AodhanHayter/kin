@@ -1,0 +1,46 @@
+{
+  "realm": "data-commons",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "clients": [
+    {
+      "clientId": "data-commons-portal",
+      "name": "Data Commons Portal",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "@PORTAL_CLIENT_SECRET@",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["http://data-commons.local/auth/callback"],
+      "webOrigins": ["http://data-commons.local"],
+      "attributes": {
+        "post.logout.redirect.uris": "http://data-commons.local/"
+      }
+    }
+  ],
+  "users": [
+    {
+      "id": "a2f0c3d4-5e6b-4a7c-8d9e-0f1a2b3c4d5e",
+      "username": "dc-admin",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": ["default-roles-data-commons"],
+      "email": "dc-admin@data-commons.local",
+      "firstName": "Data Commons",
+      "lastName": "Admin",
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "@USER_PASSWORD@",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}
