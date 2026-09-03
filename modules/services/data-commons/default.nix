@@ -61,15 +61,13 @@
             # the chart version from Chart.yaml and the image digest printed
             # in the release workflow's run summary.
             #
-            # TODO(v0.3.0): set imageDigest from the v0.3.0 release run
-            # summary. The v0.3.0 image is not built yet, so the digest is
-            # `null` — the secrets oneshot SKIPS applying the HelmChart while
+            # Set imageDigest = null to stage a chart bump before its image
+            # exists: the secrets oneshot SKIPS applying the HelmChart while
             # it is null (see "data-commons HelmChart" below) instead of
             # pinning a bogus digest that comin would auto-apply into an
-            # ImagePullBackOff. The env/S3 wiring below still converges, so
-            # the only step left after the release is pasting the digest.
+            # ImagePullBackOff; the env/companion wiring still converges.
             chartVersion = "0.3.0";
-            imageDigest = null;
+            imageDigest = "sha256:097626e533c405b38686b30a94f3721c2a175c3096738a9416d03d047b145999";
 
             # Companion image pins (update deliberately, they are decoupled
             # from app releases).
