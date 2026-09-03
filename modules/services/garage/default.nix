@@ -49,6 +49,29 @@
             rpcEnvPath = config.clan.core.vars.generators.garage-rpc-secret.files."env".path;
             accessKeyPath = config.clan.core.vars.generators.garage-backup-key.files."access-key-id".path;
             secretKeyPath = config.clan.core.vars.generators.garage-backup-key.files."secret-access-key".path;
+
+            # App-scoped key for the data-commons object store (shared var, so
+            # atlas hands the same id/secret to the app pods).
+            dcAccessKeyPath = config.clan.core.vars.generators.data-commons-s3.files."access-key-id".path;
+            dcSecretKeyPath = config.clan.core.vars.generators.data-commons-s3.files."secret-access-key".path;
+
+            # Browser presigned PUT/GET from the portal (origin
+            # http://data-commons.local, presigned host http://10.10.3.42:3900)
+            # is cross-origin, so the bucket needs a CORS rule. Garage exposes
+            # CORS only through the S3 PutBucketCors API — no CLI verb — so the
+            # oneshot signs the call with curl's native SigV4 (same mechanism as
+            # data-commons' devenv.nix). Full overwrite → idempotent.
+            dcCorsXml = pkgs.writeText "data-commons-cors.xml" ''
+              <CORSConfiguration>
+                <CORSRule>
+                  <AllowedOrigin>http://data-commons.local</AllowedOrigin>
+                  <AllowedMethod>PUT</AllowedMethod>
+                  <AllowedMethod>GET</AllowedMethod>
+                  <AllowedHeader>*</AllowedHeader>
+                  <ExposeHeader>ETag</ExposeHeader>
+                </CORSRule>
+              </CORSConfiguration>
+            '';
           in
           {
             # RPC secret — consumed only by this node, so scoped to the instance.
@@ -83,7 +106,10 @@
               wantedBy = [ "multi-user.target" ];
               after = [ "garage.service" ];
               wants = [ "garage.service" ];
-              path = [ config.services.garage.package ];
+              path = [
+                config.services.garage.package
+                pkgs.curl
+              ];
               serviceConfig = {
                 Type = "oneshot";
                 RemainAfterExit = true;
@@ -117,6 +143,29 @@
                     || garage bucket create "$bucket"
                   garage bucket allow "$bucket" --read --write --key "$access"
                 done
+
+                # ── data-commons object store ────────────────────────────
+                # Its own key, granted only on the data-commons bucket.
+                # --owner is required on top of read/write: CORS (and any other
+                # bucket-configuration op) goes through the S3 API and is
+                # owner-only.
+                dc_access=$(cat ${dcAccessKeyPath})
+                dc_secret=$(cat ${dcSecretKeyPath})
+                garage key info "$dc_access" >/dev/null 2>&1 \
+                  || garage key import --yes -n data-commons "$dc_access" "$dc_secret"
+
+                garage bucket info data-commons >/dev/null 2>&1 \
+                  || garage bucket create data-commons
+                garage bucket allow data-commons --read --write --owner --key "$dc_access"
+
+                # PutBucketCors against the local S3 API. Non-fatal: a failed
+                # CORS write must not wedge layout/bucket provisioning, and
+                # Restart=on-failure isn't set on this unit.
+                curl -sS -f -X PUT "http://127.0.0.1:3900/data-commons?cors" \
+                  --user "$dc_access:$dc_secret" \
+                  --aws-sigv4 "aws:amz:${garageSettings.s3_api.s3_region}:s3" \
+                  --upload-file ${dcCorsXml} \
+                  || echo "garage-provision: warn: PutBucketCors on data-commons failed"
               '';
             };
           };

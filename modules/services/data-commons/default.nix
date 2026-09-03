@@ -24,6 +24,14 @@
 # New secret material for Keycloak/OpenFGA is minted with:
 #   clan vars generate atlas
 #
+# Object storage (release >= 0.3.0 RAISES at boot without it): the app talks
+# to Garage on lenny (kin/garage) at http://10.10.3.42:3900, bucket
+# `data-commons`, region `garage`, with the shared data-commons-s3 key from
+# kin/secrets. lenny's garage-provision oneshot creates that bucket, imports
+# the same key with read/write/owner, and sets the CORS rule the browser
+# presigned PUT needs. Optional knobs (OBJECT_GUID_PREFIX, S3_PRESIGN_TTL,
+# S3_PRESIGN_MAX_TTL, S3_MAX_HASH_BYTES) are left at their app defaults.
+#
 # LAN exposure: data-commons.local + keycloak.local via avahi aliases ->
 # atlas -> traefik. In-cluster, coredns pins data-commons.local to atlas and
 # rewrites keycloak.local straight to the keycloak Service, so app pods reach
@@ -53,13 +61,15 @@
             # the chart version from Chart.yaml and the image digest printed
             # in the release workflow's run summary.
             #
-            # Do NOT deploy the companion slice while these still say 0.1.0:
-            # the v0.1.0 image predates the OIDC/FGA code (no oidcc/req, no
-            # KEYCLOAK_URL handling) and chart 0.1.0 has no authz-bootstrap
-            # init, so the new env keys are silently ignored and nothing
-            # converges — bump to the v0.2.0 chart + digest first.
-            chartVersion = "0.2.0";
-            imageDigest = "sha256:9cd2cdddfd68636e5a10dc5ba205bfee0e6d5b1b745cb87599ab6bbbf7930be2";
+            # TODO(v0.3.0): set imageDigest from the v0.3.0 release run
+            # summary. The v0.3.0 image is not built yet, so the digest is
+            # `null` — the secrets oneshot SKIPS applying the HelmChart while
+            # it is null (see "data-commons HelmChart" below) instead of
+            # pinning a bogus digest that comin would auto-apply into an
+            # ImagePullBackOff. The env/S3 wiring below still converges, so
+            # the only step left after the release is pasting the digest.
+            chartVersion = "0.3.0";
+            imageDigest = null;
 
             # Companion image pins (update deliberately, they are decoupled
             # from app releases).
@@ -67,6 +77,18 @@
             openfgaImage = "openfga/openfga:v1.19.0@sha256:78d1fa601d42340ecb131305d80d3767d0f254f9b1bc3646f9a557e11b24c63a";
 
             atlasIp = "10.10.3.100";
+
+            # Garage (kin/garage) lives on lenny. Addressed by LAN IP, not
+            # `lenny.local`: pods can't resolve mDNS (same reason Longhorn's
+            # AWS_ENDPOINTS and the etcd-s3 config use the raw IP), and the
+            # host in a presigned URL is part of the signature — so the app
+            # pods and the LAN browser that follows the presigned PUT/GET must
+            # use the exact same authority. A raw LAN IP satisfies both.
+            garageEndpoint = "http://10.10.3.42:3900";
+            s3Bucket = "data-commons";
+            s3Region = "garage";
+
+            s3Gen = config.clan.core.vars.generators.data-commons-s3;
 
             # Stable admin subject: the realm import pins the dc-admin user's
             # UUID (see realm-data-commons.json), so the app's admin-subs env
@@ -626,6 +648,11 @@
                     --from-literal=FGA_API_URL=http://openfga.data-commons.svc.cluster.local:8080 \
                     --from-file=FGA_API_TOKEN=${fgaGen.files."api-token".path} \
                     --from-literal=AUTHZ_ADMIN_SUBS=${adminSub} \
+                    --from-literal=S3_ENDPOINT=${garageEndpoint} \
+                    --from-file=S3_ACCESS_KEY_ID=${s3Gen.files."access-key-id".path} \
+                    --from-file=S3_SECRET_ACCESS_KEY=${s3Gen.files."secret-access-key".path} \
+                    --from-literal=S3_BUCKET=${s3Bucket} \
+                    --from-literal=S3_REGION=${s3Region} \
                     --dry-run=client -o yaml | k3s kubectl apply -f -
 
                   # GHCR auth, twice: pods pull the image from the app
@@ -647,8 +674,17 @@
                   # else — deliberately BEFORE the companions so a stuck
                   # keycloak/openfga can never block deploying or repairing
                   # the app (S0). Still never via manifests auto-deploy.
-                  step "data-commons HelmChart"
-                  k3s kubectl apply -f ${helmChart}
+                  ${
+                    if imageDigest == null then
+                      ''
+                        step "warn: imageDigest is a placeholder (set it from the v0.3.0 release run summary); skipping the HelmChart apply"
+                      ''
+                    else
+                      ''
+                        step "data-commons HelmChart"
+                        k3s kubectl apply -f ${helmChart}
+                      ''
+                  }
 
                   # ── companions (non-fatal for the app path) ──────────────
                   companions_ok=1

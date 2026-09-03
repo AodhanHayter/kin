@@ -7,6 +7,11 @@
 #   k3s-token         — shared k3s join token (server + all agents).
 #   garage-backup-key — shared S3 creds: consumed by atlas (Longhorn backups +
 #                       etcd snapshots) AND lenny (Garage import).
+#   data-commons-s3   — shared S3 creds for the data-commons object store:
+#                       consumed by atlas (data-commons-env secret) AND lenny
+#                       (Garage key import + bucket grant). Separate key from
+#                       garage-backup-key so an app-scoped credential can never
+#                       touch the backup buckets.
 #   nix-cache-key     — harmonia binary-cache keypair: sign-key signs on the
 #                       cache server (atlas), pub-key trusted by every client.
 { ... }:
@@ -39,6 +44,20 @@
               files."secret-access-key".secret = true;
               runtimeInputs = [ pkgs.openssl ];
               # Garage key-import expects its native format: GK + 24 hex, 64-hex secret.
+              script = ''
+                printf 'GK%s' "$(openssl rand -hex 12)" > "$out"/access-key-id
+                printf '%s' "$(openssl rand -hex 32)" > "$out"/secret-access-key
+              '';
+            };
+
+            # data-commons app S3 key — same Garage-native key format as
+            # garage-backup-key (GK + 24 hex id, 64 hex secret), scoped by
+            # lenny's provisioning oneshot to the `data-commons` bucket only.
+            clan.core.vars.generators.data-commons-s3 = {
+              share = true;
+              files."access-key-id".secret = true;
+              files."secret-access-key".secret = true;
+              runtimeInputs = [ pkgs.openssl ];
               script = ''
                 printf 'GK%s' "$(openssl rand -hex 12)" > "$out"/access-key-id
                 printf '%s' "$(openssl rand -hex 32)" > "$out"/secret-access-key
