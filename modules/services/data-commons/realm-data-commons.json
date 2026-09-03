@@ -41,6 +41,78 @@
           "temporary": false
         }
       ]
+    },
+    {
+      "id": "b1c2d3e4-1111-4a7c-8d9e-0f1a2b3c4d01",
+      "username": "steward.grid",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": ["default-roles-data-commons"],
+      "email": "steward.grid@data-commons.local",
+      "firstName": "Sam",
+      "lastName": "Steward",
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "@USER_PASSWORD@",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "b1c2d3e4-2222-4a7c-8d9e-0f1a2b3c4d02",
+      "username": "analyst.plant",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": ["default-roles-data-commons"],
+      "email": "analyst.plant@data-commons.local",
+      "firstName": "Ana",
+      "lastName": "Analyst",
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "@USER_PASSWORD@",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "b1c2d3e4-3333-4a7c-8d9e-0f1a2b3c4d03",
+      "username": "viewer.org",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": ["default-roles-data-commons"],
+      "email": "viewer.org@data-commons.local",
+      "firstName": "Vic",
+      "lastName": "Viewer",
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "@USER_PASSWORD@",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "b1c2d3e4-4444-4a7c-8d9e-0f1a2b3c4d04",
+      "username": "outsider",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": ["default-roles-data-commons"],
+      "email": "outsider@data-commons.local",
+      "firstName": "Otto",
+      "lastName": "Outsider",
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "@USER_PASSWORD@",
+          "temporary": false
+        }
+      ]
     }
   ]
 }

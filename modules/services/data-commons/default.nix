@@ -66,8 +66,8 @@
             # it is null (see "data-commons HelmChart" below) instead of
             # pinning a bogus digest that comin would auto-apply into an
             # ImagePullBackOff; the env/companion wiring still converges.
-            chartVersion = "0.4.0";
-            imageDigest = "sha256:38d1b4908ae280e61c85e80a8ce4e1ac0c96709a9d3479938f7bf4489bf90ef3";
+            chartVersion = "0.5.0";
+            imageDigest = "sha256:312fa3dd09568b736be15d465cd65bd85561e6a1870c1ee7f8bb837909c718c9";
 
             # Companion image pins (update deliberately, they are decoupled
             # from app releases).
@@ -101,12 +101,25 @@
             # holds only @PORTAL_CLIENT_SECRET@ / @USER_PASSWORD@ tokens, the
             # secrets are sed-substituted at activation by the oneshot.
             #
+            # Users (data-commons-kfb.1): dc-admin plus the four demo
+            # personas steward.grid, analyst.plant, viewer.org and outsider.
+            # All five share the one user-password var. Their UUIDs are
+            # PINNED here because the app's OpenFGA seed manifest
+            # (priv/seed/authz.json in the data-commons repo) grants tuples
+            # to those literal subjects — the realm import is the only
+            # Keycloak path that honours a supplied user id, so these UUIDs
+            # and that manifest must be changed together or the personas log
+            # in holding no permissions. AUTHZ_ADMIN_SUBS (below) still owns
+            # dc-admin's org-admin grant; the manifest deliberately does not.
+            #
             # --import-realm semantics: Keycloak imports at every startup but
             # SKIPS realms that already exist, so restarts are no-ops — and
             # later edits to this template will NOT reach a live realm.
             # Post-first-boot realm changes need kcadm/admin-console, or a
             # realm delete + pod restart (sessions lost; the pinned user UUID
-            # survives reimport).
+            # survives reimport). The four personas were ADDED after first
+            # boot, so a live realm needs exactly that delete + restart
+            # before they exist.
             realmTemplate = ./realm-data-commons.json;
 
             # CNPG database cluster. postInitSQL grants CREATEROLE: the app
@@ -467,6 +480,13 @@
                     ingress:
                       enabled: true
                       host: data-commons.local
+                    # Seeds staging personas' data (data-commons-kfb.3). The
+                    # post-install/post-upgrade hook Job is idempotent, safe
+                    # to leave on across upgrades; reset with:
+                    #   kubectl exec deploy/data-commons -c app -- \
+                    #     /app/bin/data_commons rpc "DataCommons.Seed.reset()"
+                    seed:
+                      enabled: true
                   '';
                 };
               }
@@ -716,19 +736,21 @@
                     # keeps them off argv//proc/cmdline) -> rendered tmpfile
                     # -> k8s Secret. Never the nix store. Substitution
                     # safety: the generators emit pure hex (no sed
-                    # metacharacters, no JSON escapes) and each placeholder
-                    # occurs exactly once in the template, so plain `s|…|…|`
-                    # without `g` is correct — revisit both facts together
-                    # if either ever changes.
+                    # metacharacters, no JSON escapes). @USER_PASSWORD@ now
+                    # occurs once per seeded user (five, since kfb.1 added
+                    # the demo personas), so both rules carry the `g` flag —
+                    # without it correctness would silently depend on the
+                    # template keeping one placeholder per line, which a
+                    # reformat could break.
                     step "keycloak-realm-import secret"
                     umask 077
                     sedprog=$(mktemp)
                     realm=$(mktemp)
                     trap 'rm -f "$sedprog" "$realm"' EXIT
-                    printf 's|@PORTAL_CLIENT_SECRET@|%s|\n' "$(cat ${
+                    printf 's|@PORTAL_CLIENT_SECRET@|%s|g\n' "$(cat ${
                       kcGen.files."portal-client-secret".path
                     })" > "$sedprog"
-                    printf 's|@USER_PASSWORD@|%s|\n' "$(cat ${kcGen.files."user-password".path})" >> "$sedprog"
+                    printf 's|@USER_PASSWORD@|%s|g\n' "$(cat ${kcGen.files."user-password".path})" >> "$sedprog"
                     sed -f "$sedprog" ${realmTemplate} > "$realm"
                     k3s kubectl -n data-commons create secret generic keycloak-realm-import \
                       --from-file=data-commons-realm.json="$realm" \
