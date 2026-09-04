@@ -25,7 +25,7 @@
 #   clan vars generate atlas
 #
 # Object storage (release >= 0.3.0 RAISES at boot without it): the app talks
-# to Garage on lenny (kin/garage) at http://10.10.3.42:3900, bucket
+# to Garage on lenny (kin/garage) at http://s3.local:3900 (10.10.3.42), bucket
 # `data-commons`, region `garage`, with the shared data-commons-s3 key from
 # kin/secrets. lenny's garage-provision oneshot creates that bucket, imports
 # the same key with read/write/owner, and sets the CORS rule the browser
@@ -33,9 +33,17 @@
 # S3_PRESIGN_MAX_TTL, S3_MAX_HASH_BYTES) are left at their app defaults.
 #
 # LAN exposure: data-commons.local + keycloak.local via avahi aliases ->
-# atlas -> traefik. In-cluster, coredns pins data-commons.local to atlas and
-# rewrites keycloak.local straight to the keycloak Service, so app pods reach
-# the OIDC issuer under the exact browser-visible URL.
+# atlas -> traefik; s3.local via an avahi alias published from lenny itself
+# (kin/garage's `avahi-alias-s3` unit) straight to Garage's own S3 port,
+# since presigned URLs bypass traefik entirely. In-cluster, coredns pins
+# data-commons.local and s3.local via `hosts` blocks and rewrites
+# keycloak.local straight to the keycloak Service, so app pods and LAN
+# browsers both reach every companion under the exact same authority a
+# presigned SigV4 URL was signed with.
+#
+# Off-LAN (cloudflared) browsers cannot resolve `s3.local` (mDNS doesn't
+# cross the tunnel) — that gap is unchanged by this pin and is tracked
+# separately (data-commons-8qq's close reason) rather than solved here.
 { ... }:
 {
   _class = "clan.service";
@@ -66,8 +74,8 @@
             # it is null (see "data-commons HelmChart" below) instead of
             # pinning a bogus digest that comin would auto-apply into an
             # ImagePullBackOff; the env/companion wiring still converges.
-            chartVersion = "0.8.0";
-            imageDigest = "sha256:12d1ee33cfdee28e94e608be5dedaefcda244d1b5faaf85410e574761b832fa4";
+            chartVersion = "0.9.0";
+            imageDigest = "sha256:cf8a59be6e346fc7fd4a6973859a42bd161b3cb035232da42d56e41073beda4b";
 
             # Companion image pins (update deliberately, they are decoupled
             # from app releases).
@@ -76,13 +84,19 @@
 
             atlasIp = "10.10.3.100";
 
-            # Garage (kin/garage) lives on lenny. Addressed by LAN IP, not
-            # `lenny.local`: pods can't resolve mDNS (same reason Longhorn's
-            # AWS_ENDPOINTS and the etcd-s3 config use the raw IP), and the
-            # host in a presigned URL is part of the signature — so the app
-            # pods and the LAN browser that follows the presigned PUT/GET must
-            # use the exact same authority. A raw LAN IP satisfies both.
-            garageEndpoint = "http://10.10.3.42:3900";
+            # Garage (kin/garage) lives on lenny at this raw LAN IP. The host
+            # in a presigned URL is part of the SigV4 signature, so pods and
+            # the LAN browser that follows the presigned PUT/GET must resolve
+            # the SAME authority — hence pinning `s3.local` to this IP both
+            # in-cluster (coredns `hosts` block below, same trick as
+            # `data-commons.local`) and on the LAN (avahi alias published from
+            # lenny itself, kin/garage's `avahi-alias-s3` unit), rather than
+            # addressing Garage by raw IP directly (data-commons-8qq: the raw
+            # IP is also unreachable by name for any future non-LAN portal
+            # origin, and `s3.local` gives us one place to repoint if Garage
+            # ever moves host).
+            garageIp = "10.10.3.42";
+            garageEndpoint = "http://s3.local:3900";
             s3Bucket = "data-commons";
             s3Region = "garage";
 
@@ -568,6 +582,11 @@
                       ${atlasIp} data-commons.local
                     }
                   }
+                  s3.local {
+                    hosts {
+                      ${garageIp} s3.local
+                    }
+                  }
                 '';
                 data."data-commons-keycloak.override" = ''
                   rewrite name exact keycloak.local keycloak.data-commons.svc.cluster.local
@@ -614,7 +633,19 @@
               # alone do NOT restart running pods (envFrom is start-time) —
               # pair them with a digest bump or `kubectl rollout restart`.
               data-commons-secrets = {
-                description = "Sync data-commons DBs, companions, app env + GHCR credentials into k8s";
+                # data-commons-9hm: a null imageDigest above is otherwise only
+                # visible as a `step "warn: ..."` line buried in this unit's
+                # journal — easy to forget once staged. `lib.warnIf` on the
+                # unit description forces an eval-time warning on every `nix
+                # eval`/`nix build`/`clan machines update` that touches this
+                # module (systemd unit descriptions are always forced when
+                # generating the unit file), i.e. the cheapest place for a
+                # forgotten digest to surface — in build/deploy output,
+                # before anything touches the cluster.
+                description =
+                  lib.warnIf (imageDigest == null)
+                    "data-commons: imageDigest is null — the HelmChart apply will be SKIPPED by data-commons-secrets. Set it from the v0.3.0+ release run summary before this is a real deploy."
+                    "Sync data-commons DBs, companions, app env + GHCR credentials into k8s";
                 wantedBy = [ "multi-user.target" ];
                 after = [ "k3s.service" ];
                 wants = [ "k3s.service" ];

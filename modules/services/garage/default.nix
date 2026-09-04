@@ -101,6 +101,38 @@
             # S3 API for Longhorn / k3s on the other nodes.
             networking.firewall.allowedTCPPorts = [ 3900 ];
 
+            # mDNS alias so LAN browsers following a presigned URL resolve
+            # `s3.local` to lenny's own address — the SAME name the
+            # data-commons module pins in-cluster (coredns `hosts` block) for
+            # app pods, since the host in a presigned URL is part of the
+            # SigV4 signature and must be byte-identical for both callers
+            # (data-commons-8qq). Published from lenny itself, unlike the
+            # data-commons.local/keycloak.local aliases atlas publishes for
+            # itself — avahi-publish just injects an mDNS record, it doesn't
+            # require the publishing host to own the address, but publishing
+            # from the address's actual owner is the simpler, more obviously
+            # correct choice here.
+            # avahi denies client entry groups unless user-service
+            # publishing is on, and avahi-publish is a client. Without this
+            # the unit below crash-loops under Restart=always and s3.local
+            # never resolves on the LAN — which breaks EVERY presigned
+            # upload/download, since the host is part of the SigV4 signature
+            # and has no fallback. Same flag, same reason, as
+            # modules/services/monitoring and modules/services/gen3 (which
+            # only ever needed it because they land on atlas).
+            services.avahi.publish.userServices = true;
+            systemd.services.avahi-alias-s3 = {
+              description = "mDNS alias s3.local -> lenny (this host)";
+              after = [ "avahi-daemon.service" ];
+              requires = [ "avahi-daemon.service" ];
+              wantedBy = [ "multi-user.target" ];
+              serviceConfig = {
+                ExecStart = "${pkgs.avahi}/bin/avahi-publish -a -R s3.local 10.10.3.42";
+                Restart = "always";
+                RestartSec = 5;
+              };
+            };
+
             systemd.services.garage-provision = {
               description = "Provision Garage layout, buckets and backup key";
               wantedBy = [ "multi-user.target" ];
