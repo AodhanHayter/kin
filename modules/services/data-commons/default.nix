@@ -66,8 +66,8 @@
             # it is null (see "data-commons HelmChart" below) instead of
             # pinning a bogus digest that comin would auto-apply into an
             # ImagePullBackOff; the env/companion wiring still converges.
-            chartVersion = "0.7.0";
-            imageDigest = "sha256:7d887243b66a26522ea4b26a4610d93dd5d855e61244fa7d8f5d4d8fe6cff4ec";
+            chartVersion = "0.8.0";
+            imageDigest = "sha256:12d1ee33cfdee28e94e608be5dedaefcda244d1b5faaf85410e574761b832fa4";
 
             # Companion image pins (update deliberately, they are decoupled
             # from app releases).
