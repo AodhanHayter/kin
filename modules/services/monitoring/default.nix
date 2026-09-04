@@ -230,6 +230,21 @@
                         # Scrape comin's exporter (:4243) on every node via the
                         # k8s node list — comin runs on all nodes (tags.all), so
                         # the node set IS the target set; no hardcoded IPs.
+                        #
+                        # data-commons (data-commons-yv1x/4zl1): the Phoenix app's
+                        # own /metrics (DataCommonsWeb.MetricsController — no
+                        # Prometheus exporter dep, a plain text-exposition
+                        # controller reading DataCommons.Objects.count_failed_uploads/0
+                        # and PartitionManager.default_partition_count/0). Endpoints
+                        # role (not node, unlike comin) resolves straight to the
+                        # data-commons Service's `http` port (4000) via k8s service
+                        # discovery — confirmed against the live cluster:
+                        # `k3s kubectl -n data-commons get svc data-commons` has
+                        # labels app.kubernetes.io/name=data-commons and a port
+                        # named `http` on 4000. Never exposed through the
+                        # data-commons.local Ingress (that chart's Ingress only
+                        # routes the app's own host rules) — cluster-internal scrape
+                        # only, matching the controller's no-session/no-auth stance.
                         additionalScrapeConfigs:
                           - job_name: comin
                             kubernetes_sd_configs:
@@ -243,6 +258,20 @@
                                 replacement: "$1:4243"
                               - source_labels: [__meta_kubernetes_node_name]
                                 target_label: instance
+                          - job_name: data-commons
+                            kubernetes_sd_configs:
+                              - role: endpoints
+                                namespaces:
+                                  names: [data-commons]
+                            scheme: http
+                            metrics_path: /metrics
+                            relabel_configs:
+                              - source_labels: [__meta_kubernetes_service_name]
+                                action: keep
+                                regex: data-commons
+                              - source_labels: [__meta_kubernetes_endpoint_port_name]
+                                action: keep
+                                regex: http
 
                     # comin GitOps health alerts. additionalPrometheusRulesMap is
                     # rendered to a PrometheusRule by the chart, so its ruleSelector
@@ -300,6 +329,33 @@
                                 annotations:
                                   summary: "{{ $labels.instance }} needs reboot (comin)"
                                   description: "comin_need_to_reboot=1 for 6h on {{ $labels.instance }}; kernel/initrd change not active until reboot."
+
+                      # data-commons dead-letter / audit-partition alerts
+                      # (data-commons-yv1x/4zl1). Both gauges are 0 on a healthy
+                      # system (see DataCommonsWeb.MetricsController); "> 0 for 1h"
+                      # matches each bead's ask, long enough to skip a
+                      # single-scrape blip but short enough that a stuck store or a
+                      # missed monthly audit partition is noticed same-day.
+                      data-commons:
+                        groups:
+                          - name: data-commons.rules
+                            rules:
+                              - alert: DataCommonsUploadsFailed
+                                expr: data_commons_uploads_failed > 0
+                                for: 1h
+                                labels:
+                                  severity: warning
+                                annotations:
+                                  summary: "data-commons has dead-lettered uploads"
+                                  description: "data_commons_uploads_failed has been > 0 for 1h: {{ $value }} record(s) stuck in upload_state :failed. Retry via POST /api/objects/uploads/:did/retry or the /objects portal button before the 7x-TTL reaper sweeps them."
+                              - alert: DataCommonsAuditDefaultPartitionRows
+                                expr: data_commons_audit_default_partition_rows > 0
+                                for: 1h
+                                labels:
+                                  severity: warning
+                                annotations:
+                                  summary: "audit.events_default is not draining"
+                                  description: "data_commons_audit_default_partition_rows has been > 0 for 1h: {{ $value }} row(s) stranded outside their monthly partition. PartitionManager.drain_default/1 runs daily and should keep this at 0; a persistent nonzero value means the drain itself is failing."
 
                     # Control plane lives only on atlas (single k3s server); scrape it
                     # by node IP. Serving certs don't carry that IP as a SAN, hence
