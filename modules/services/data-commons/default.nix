@@ -12,6 +12,9 @@
 #     templated JSON) behind traefik at keycloak.local;
 #   * OpenFGA (postgres datastore, preshared-key authn) as a cluster-internal
 #     service only;
+#   * Mailpit (data-commons-69lc) as the cluster SMTP relay for module 18's
+#     access-request notifications — no auth, no persistence, UI exposed at
+#     mail.local exactly like keycloak.local;
 #   * the data-commons-secrets oneshot that composes every k8s secret from
 #     CNPG credentials + clan vars, applies the companion workloads, and
 #     applies the app HelmChart LAST (never via manifests auto-deploy, which
@@ -32,13 +35,13 @@
 # presigned PUT needs. Optional knobs (OBJECT_GUID_PREFIX, S3_PRESIGN_TTL,
 # S3_PRESIGN_MAX_TTL, S3_MAX_HASH_BYTES) are left at their app defaults.
 #
-# LAN exposure: data-commons.local + keycloak.local via avahi aliases ->
-# atlas -> traefik; s3.local via an avahi alias published from lenny itself
-# (kin/garage's `avahi-alias-s3` unit) straight to Garage's own S3 port,
-# since presigned URLs bypass traefik entirely. In-cluster, coredns pins
-# data-commons.local and s3.local via `hosts` blocks and rewrites
-# keycloak.local straight to the keycloak Service, so app pods and LAN
-# browsers both reach every companion under the exact same authority a
+# LAN exposure: data-commons.local + keycloak.local + mail.local via avahi
+# aliases -> atlas -> traefik; s3.local via an avahi alias published from
+# lenny itself (kin/garage's `avahi-alias-s3` unit) straight to Garage's own
+# S3 port, since presigned URLs bypass traefik entirely. In-cluster, coredns
+# pins data-commons.local, s3.local and mail.local via `hosts` blocks and
+# rewrites keycloak.local straight to the keycloak Service, so app pods and
+# LAN browsers both reach every companion under the exact same authority a
 # presigned SigV4 URL was signed with.
 #
 # Off-LAN (cloudflared) browsers cannot resolve `s3.local` (mDNS doesn't
@@ -74,13 +77,17 @@
             # it is null (see "data-commons HelmChart" below) instead of
             # pinning a bogus digest that comin would auto-apply into an
             # ImagePullBackOff; the env/companion wiring still converges.
-            chartVersion = "0.9.1";
-            imageDigest = "sha256:f97e878734f914ba24e048f0666a303578f42a7626936e46bb2dd3ddb0978aa6";
+            chartVersion = "0.10.0";
+            imageDigest = "sha256:606e2aa36e792fddcf19d7919f1a90b0bbe7c3e9b9a971e2fbd5a9d5b9e17f27";
 
             # Companion image pins (update deliberately, they are decoupled
             # from app releases).
             keycloakImage = "quay.io/keycloak/keycloak:26.7.3@sha256:ff4257d0d64efbe99ed1ddfaf07765cc3c36dc7518bf8324d41961327f441c54";
             openfgaImage = "openfga/openfga:v1.19.0@sha256:78d1fa601d42340ecb131305d80d3767d0f254f9b1bc3646f9a557e11b24c63a";
+            # Cluster SMTP relay for module 18's access-request notifications
+            # (data-commons-69lc). No auth, no persistence needed — mail is
+            # disposable demo/staging traffic, not something anyone restores.
+            mailpitImage = "docker.io/axllent/mailpit:v1.31.0@sha256:c96991d9bef73594c246d89ca81411d4e916f03e76a7d2d72fa2ab5dd3c9ce24";
 
             atlasIp = "10.10.3.100";
 
@@ -467,6 +474,118 @@
               }
             );
 
+            # Mailpit: catches every access-request notification the app
+            # sends (module 18) so approvals/denials are visible without a
+            # real relay. No auth, no persistence (ephemeral emptyDir-free
+            # in-memory store is fine — mail here is disposable). SMTP on
+            # 1025 for the app, web UI on 8025 behind the mail.local Ingress
+            # (same traefik front door as data-commons.local, same hosts-pin
+            # trick in the coredns ConfigMap below).
+            mailpitManifest = pkgs.writeText "mailpit.json" (
+              builtins.toJSON {
+                apiVersion = "v1";
+                kind = "List";
+                items = [
+                  {
+                    apiVersion = "apps/v1";
+                    kind = "Deployment";
+                    metadata = {
+                      name = "mailpit";
+                      namespace = "data-commons";
+                      labels.app = "mailpit";
+                    };
+                    spec = {
+                      replicas = 1;
+                      selector.matchLabels.app = "mailpit";
+                      template = {
+                        metadata.labels.app = "mailpit";
+                        spec = {
+                          containers = [
+                            {
+                              name = "mailpit";
+                              image = mailpitImage;
+                              ports = [
+                                {
+                                  name = "smtp";
+                                  containerPort = 1025;
+                                }
+                                {
+                                  name = "http";
+                                  containerPort = 8025;
+                                }
+                              ];
+                              readinessProbe = {
+                                httpGet = {
+                                  path = "/readyz";
+                                  port = 8025;
+                                };
+                                periodSeconds = 10;
+                              };
+                              livenessProbe = {
+                                httpGet = {
+                                  path = "/readyz";
+                                  port = 8025;
+                                };
+                                initialDelaySeconds = 10;
+                                periodSeconds = 30;
+                              };
+                            }
+                          ];
+                        };
+                      };
+                    };
+                  }
+                  {
+                    apiVersion = "v1";
+                    kind = "Service";
+                    metadata = {
+                      name = "mailpit";
+                      namespace = "data-commons";
+                      labels.app = "mailpit";
+                    };
+                    spec = {
+                      selector.app = "mailpit";
+                      ports = [
+                        {
+                          name = "smtp";
+                          port = 1025;
+                          targetPort = 1025;
+                        }
+                        {
+                          name = "http";
+                          port = 8025;
+                          targetPort = 8025;
+                        }
+                      ];
+                    };
+                  }
+                  {
+                    apiVersion = "networking.k8s.io/v1";
+                    kind = "Ingress";
+                    metadata = {
+                      name = "mailpit";
+                      namespace = "data-commons";
+                    };
+                    spec.rules = [
+                      {
+                        host = "mail.local";
+                        http.paths = [
+                          {
+                            path = "/";
+                            pathType = "Prefix";
+                            backend.service = {
+                              name = "mailpit";
+                              port.number = 8025;
+                            };
+                          }
+                        ];
+                      }
+                    ];
+                  }
+                ];
+              }
+            );
+
             # Applied by data-commons-secrets after the namespace + pull
             # secrets exist — never via k3s manifests auto-deploy, which would
             # race helm-controller against the secrets unit.
@@ -587,6 +706,11 @@
                       ${garageIp} s3.local
                     }
                   }
+                  mail.local {
+                    hosts {
+                      ${atlasIp} mail.local
+                    }
+                  }
                 '';
                 data."data-commons-keycloak.override" = ''
                   rewrite name exact keycloak.local keycloak.data-commons.svc.cluster.local
@@ -615,6 +739,18 @@
                 wantedBy = [ "multi-user.target" ];
                 serviceConfig = {
                   ExecStart = "${pkgs.avahi}/bin/avahi-publish -a -R keycloak.local ${atlasIp}";
+                  Restart = "always";
+                  RestartSec = 5;
+                };
+              };
+
+              avahi-alias-mail = {
+                description = "mDNS alias mail.local -> atlas (Mailpit UI, data-commons-69lc)";
+                after = [ "avahi-daemon.service" ];
+                requires = [ "avahi-daemon.service" ];
+                wantedBy = [ "multi-user.target" ];
+                serviceConfig = {
+                  ExecStart = "${pkgs.avahi}/bin/avahi-publish -a -R mail.local ${atlasIp}";
                   Restart = "always";
                   RestartSec = 5;
                 };
@@ -702,6 +838,9 @@
                     --from-file=S3_SECRET_ACCESS_KEY=${s3Gen.files."secret-access-key".path} \
                     --from-literal=S3_BUCKET=${s3Bucket} \
                     --from-literal=S3_REGION=${s3Region} \
+                    --from-literal=SMTP_HOST=mailpit.data-commons.svc.cluster.local \
+                    --from-literal=SMTP_PORT=1025 \
+                    --from-literal=MAIL_FROM=data-commons@local \
                     --dry-run=client -o yaml | k3s kubectl apply -f -
 
                   # GHCR auth, twice: pods pull the image from the app
@@ -734,6 +873,12 @@
                         k3s kubectl apply -f ${helmChart}
                       ''
                   }
+
+                  # Mailpit has no CNPG/companion dependency at all (it's
+                  # stateless), so it goes up unconditionally and cheaply
+                  # here rather than in the bounded companion wait below.
+                  step "mailpit workload"
+                  k3s kubectl apply -f ${mailpitManifest}
 
                   # ── companions (non-fatal for the app path) ──────────────
                   companions_ok=1

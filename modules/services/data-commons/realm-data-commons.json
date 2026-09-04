@@ -19,7 +19,10 @@
       "redirectUris": ["http://data-commons.local/auth/callback"],
       "webOrigins": ["http://data-commons.local"],
       "attributes": {
-        "post.logout.redirect.uris": "http://data-commons.local/"
+        "post.logout.redirect.uris": "http://data-commons.local/",
+        "backchannel.logout.url": "http://data-commons.data-commons.svc.cluster.local:4000/auth/backchannel-logout",
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.revoke.offline.tokens": "false"
       }
     }
   ],
