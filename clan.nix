@@ -11,7 +11,7 @@
 let
   # Prepared only. Enabling requires the invited-demo migration/publication gate
   # in data-commons/docs/invited-demo.md; comin deploys pushed inventory changes.
-  dataCommonsInternetDemo = false;
+  dataCommonsInternetDemo = true;
 in
 {
   meta.name = "kin";
