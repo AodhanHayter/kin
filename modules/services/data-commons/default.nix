@@ -613,6 +613,17 @@
                     ingress:
                       enabled: true
                       host: data-commons.local
+                    # Jobs stay on LocalRunner until a compatible published
+                    # app/chart/jobs release and its immutable jobs-image
+                    # digest are accepted. These values are staged for that
+                    # release; the pinned 0.13.0 chart may ignore them.
+                    jobs:
+                      runner: local
+                      argoNamespace: data-commons
+                      jobServiceAccount: data-commons-job
+                      runTtlSeconds: 7200
+                      imagePullSecrets:
+                        - ghcr-pull
                     # Seeds staging personas' data (data-commons-kfb.3). The
                     # post-install/post-upgrade hook Job is idempotent, safe
                     # to leave on across upgrades; reset with:
@@ -673,6 +684,62 @@
             };
 
             services.k3s.manifests.data-commons.content = [
+              # The HelmChart can reconcile before data-commons-secrets runs,
+              # so declare its target namespace in the addon manifest too.
+              {
+                apiVersion = "v1";
+                kind = "Namespace";
+                metadata.name = "data-commons";
+              }
+              # Argo Workflows runs only data-commons Workflows. The upstream
+              # chart owns its controller, workflow ServiceAccount, executor
+              # Role/RoleBinding, and manual service-account-token Secret.
+              # Keep this release pin in step with the chart's published
+              # artifact; do not recreate any of these objects elsewhere.
+              {
+                apiVersion = "helm.cattle.io/v1";
+                kind = "HelmChart";
+                metadata = {
+                  name = "argo-workflows";
+                  namespace = "kube-system";
+                };
+                spec = {
+                  repo = "https://argoproj.github.io/argo-helm";
+                  chart = "argo-workflows";
+                  version = "2.0.6"; # appVersion v4.1.3
+                  targetNamespace = "data-commons";
+                  valuesContent = ''
+                    # Namespace-scoped controller only; no UI/server or
+                    # cluster-wide workflow-template surface. Minified CRDs
+                    # avoid the chart's cluster-scoped CRD upgrade hook.
+                    crds:
+                      full: false
+                    createAggregateRoles: false
+                    singleNamespace: true
+                    server:
+                      enabled: false
+                      rbac:
+                        create: false
+                      clusterWorkflowTemplates:
+                        enabled: false
+                    controller:
+                      rbac:
+                        create: true
+                      clusterWorkflowTemplates:
+                        enabled: false
+                    workflow:
+                      serviceAccount:
+                        create: true
+                        createSecret: true
+                        name: data-commons-job
+                      rbac:
+                        create: true
+                        agentPermissions: false
+                        artifactGC: false
+                        rules: []
+                  '';
+                };
+              }
               # In-cluster DNS for the LAN names (pods can't resolve mDNS).
               # Single writer: this ConfigMap is owned by the data-commons
               # Addon — every data-commons entry MUST live in this one
@@ -830,6 +897,7 @@
                     --from-literal=OIDC_ALLOW_INSECURE=true \
                     --from-literal=PHX_SCHEME=http \
                     --from-file=KEYCLOAK_PORTAL_CLIENT_SECRET=${kcGen.files."portal-client-secret".path} \
+                    --from-literal=DC_API_BASE_URL=http://data-commons.data-commons.svc.cluster.local:4000 \
                     --from-literal=FGA_API_URL=http://openfga.data-commons.svc.cluster.local:8080 \
                     --from-file=FGA_API_TOKEN=${fgaGen.files."api-token".path} \
                     --from-literal=AUTHZ_ADMIN_SUBS=${adminSub} \
