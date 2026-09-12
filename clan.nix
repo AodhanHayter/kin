@@ -8,6 +8,11 @@
 # toggle layer; `modules` registers kin's own services, `module.input = "self"`
 # pulls them, and `module.input = "clan-core"` pulls upstream prebuilt ones.
 { ... }:
+let
+  # Prepared only. Enabling requires the invited-demo migration/publication gate
+  # in data-commons/docs/invited-demo.md; comin deploys pushed inventory changes.
+  dataCommonsInternetDemo = false;
+in
 {
   meta.name = "kin";
   # mDNS domain; surfaces as config.clan.core.settings.domain (used to derive
@@ -211,6 +216,7 @@
         input = "self";
       };
       roles.default.tags.k3s-server = { };
+      roles.default.settings.internetDemo = dataCommonsInternetDemo;
     };
 
     # ---- Garage S3 backup target (lenny only) ----
@@ -220,6 +226,8 @@
         input = "self";
       };
       roles.default.machines.lenny = { };
+      roles.default.settings.dataCommonsPortalOrigin =
+        if dataCommonsInternetDemo then "https://data-demo.fissio.com" else "http://data-commons.local";
     };
 
     # ---- ARC GitHub Actions runners (server only) ----

@@ -44,9 +44,10 @@
 # LAN browsers both reach every companion under the exact same authority a
 # presigned SigV4 URL was signed with.
 #
-# Off-LAN (cloudflared) browsers cannot resolve `s3.local` (mDNS doesn't
-# cross the tunnel) — that gap is unchanged by this pin and is tracked
-# separately (data-commons-8qq's close reason) rather than solved here.
+# The internetDemo profile replaces the app, issuer and S3 URLs with public
+# HTTPS names. Cloudflared connects directly to the HTTP origins on the trusted
+# cluster/LAN; no ingress TLS or public route is installed by this module.
+# See data-commons/docs/invited-demo.md before enabling. Default remains LAN-only.
 { ... }:
 {
   _class = "clan.service";
@@ -56,8 +57,15 @@
 
   roles.default = {
     description = "Deploy the data-commons chart + CNPG database from this server.";
+    interface = { lib, ... }: {
+      options.internetDemo = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Use the invited-demo HTTPS hostnames; requires live realm migration and tunnel publication separately.";
+      };
+    };
     perInstance =
-      { ... }:
+      { settings, ... }:
       {
         nixosModule =
           {
@@ -77,7 +85,9 @@
             # it is null (see "data-commons HelmChart" below) instead of
             # pinning a bogus digest that comin would auto-apply into an
             # ImagePullBackOff; the env/companion wiring still converges.
-            chartVersion = "0.13.0";
+            # 0.13.1 adds HTTPS-aware health probes; publish that chart before
+            # enabling the profile. The app image itself does not change.
+            chartVersion = if settings.internetDemo then "0.13.1" else "0.13.0";
             imageDigest = "sha256:81656c772f33d0b5d51d58c53229ab7c482f18962c16723f9106d9c48a5a025f";
 
             # Companion image pins (update deliberately, they are decoupled
@@ -90,6 +100,10 @@
             mailpitImage = "docker.io/axllent/mailpit:v1.31.0@sha256:c96991d9bef73594c246d89ca81411d4e916f03e76a7d2d72fa2ab5dd3c9ce24";
 
             atlasIp = "10.10.3.100";
+            portalHost = if settings.internetDemo then "data-demo.fissio.com" else "data-commons.local";
+            scheme = if settings.internetDemo then "https" else "http";
+            keycloakUrl =
+              if settings.internetDemo then "https://demo-auth.fissio.com" else "http://keycloak.local";
 
             # Garage (kin/garage) lives on lenny at this raw LAN IP. The host
             # in a presigned URL is part of the SigV4 signature, so pods and
@@ -103,7 +117,8 @@
             # origin, and `s3.local` gives us one place to repoint if Garage
             # ever moves host).
             garageIp = "10.10.3.42";
-            garageEndpoint = "http://s3.local:3900";
+            garageEndpoint =
+              if settings.internetDemo then "https://demo-files.fissio.com" else "http://s3.local:3900";
             s3Bucket = "data-commons";
             s3Region = "garage";
 
@@ -141,7 +156,9 @@
             # survives reimport). The four personas were ADDED after first
             # boot, so a live realm needs exactly that delete + restart
             # before they exist.
-            realmTemplate = ./realm-data-commons.json;
+            # The invite-only import has no shared personas. Existing realms
+            # still need explicit migration: import NEVER disables live users.
+            realmTemplate = if settings.internetDemo then ./realm-demo.json else ./realm-data-commons.json;
 
             # CNPG database cluster. postInitSQL grants CREATEROLE: the app
             # login role doubles as the migration role and D3 migrations
@@ -258,7 +275,7 @@
                               env = [
                                 {
                                   name = "KC_HOSTNAME";
-                                  value = "http://keycloak.local";
+                                  value = keycloakUrl;
                                 }
                                 {
                                   name = "KC_HTTP_ENABLED";
@@ -609,17 +626,17 @@
                       - name: ghcr-pull
                     existingSecret: data-commons-env
                     env:
-                      phxHost: data-commons.local
+                      phxHost: ${portalHost}
                     ingress:
-                      enabled: true
-                      host: data-commons.local
+                      enabled: ${lib.boolToString (!settings.internetDemo)}
+                      host: ${portalHost}
                     # Seeds staging personas' data (data-commons-kfb.3). The
                     # post-install/post-upgrade hook Job is idempotent, safe
                     # to leave on across upgrades; reset with:
                     #   kubectl exec deploy/data-commons -c app -- \
                     #     /app/bin/data_commons rpc "DataCommons.Seed.reset()"
                     seed:
-                      enabled: true
+                      enabled: ${lib.boolToString (!settings.internetDemo)}
                   '';
                 };
               }
@@ -659,6 +676,16 @@
                 openssl rand -hex 24 | tr -d '\n' > "$out"/admin-password
                 openssl rand -hex 24 | tr -d '\n' > "$out"/portal-client-secret
                 openssl rand -hex 24 | tr -d '\n' > "$out"/user-password
+              '';
+            };
+
+            # Separate generator: do not regenerate the existing Keycloak
+            # generator (it also owns the portal client secret).
+            clan.core.vars.generators.data-commons-demo-admin = lib.mkIf settings.internetDemo {
+              files."password".secret = true;
+              runtimeInputs = [ pkgs.openssl ];
+              script = ''
+                openssl rand -hex 24 | tr -d '\n' > "$out"/password
               '';
             };
 
@@ -826,9 +853,10 @@
                   k3s kubectl -n data-commons create secret generic data-commons-env \
                     --from-literal=DATABASE_URL="$db_url" \
                     --from-file=SECRET_KEY_BASE=${envGen.files."secret-key-base".path} \
-                    --from-literal=KEYCLOAK_URL=http://keycloak.local \
-                    --from-literal=OIDC_ALLOW_INSECURE=true \
-                    --from-literal=PHX_SCHEME=http \
+                    --from-literal=KEYCLOAK_URL=${keycloakUrl} \
+                    --from-literal=OIDC_ALLOW_INSECURE=${lib.boolToString (!settings.internetDemo)} \
+                    --from-literal=PHX_SCHEME=${scheme} \
+                    ${lib.optionalString settings.internetDemo "--from-literal=S3_MAX_HASH_BYTES=52428800"} \
                     --from-file=KEYCLOAK_PORTAL_CLIENT_SECRET=${kcGen.files."portal-client-secret".path} \
                     --from-literal=FGA_API_URL=http://openfga.data-commons.svc.cluster.local:8080 \
                     --from-file=FGA_API_TOKEN=${fgaGen.files."api-token".path} \
@@ -926,7 +954,18 @@
                     printf 's|@PORTAL_CLIENT_SECRET@|%s|g\n' "$(cat ${
                       kcGen.files."portal-client-secret".path
                     })" > "$sedprog"
-                    printf 's|@USER_PASSWORD@|%s|g\n' "$(cat ${kcGen.files."user-password".path})" >> "$sedprog"
+                    ${
+                      if settings.internetDemo then
+                        ''
+                          printf 's|@DEMO_ADMIN_PASSWORD@|%s|g\n' "$(cat ${
+                            config.clan.core.vars.generators.data-commons-demo-admin.files."password".path
+                          })" >> "$sedprog"
+                        ''
+                      else
+                        ''
+                          printf 's|@USER_PASSWORD@|%s|g\n' "$(cat ${kcGen.files."user-password".path})" >> "$sedprog"
+                        ''
+                    }
                     sed -f "$sedprog" ${realmTemplate} > "$realm"
                     k3s kubectl -n data-commons create secret generic keycloak-realm-import \
                       --from-file=data-commons-realm.json="$realm" \

@@ -11,6 +11,7 @@
     pkgs.kubectl
     pkgs.kubernetes-helm
     pkgs.k9s
+    pkgs.python3 # offline invited-demo realm/tunnel contract checks
   ];
 
   # https://devenv.sh/basics/
