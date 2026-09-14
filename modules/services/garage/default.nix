@@ -16,8 +16,15 @@
 
   roles.default = {
     description = "Run a Garage S3 node (backup target) on this machine.";
+    interface = { lib, ... }: {
+      options.dataCommonsPortalOrigin = lib.mkOption {
+        type = lib.types.str;
+        default = "http://data-commons.local";
+        description = "Exact portal origin allowed by the data-commons bucket CORS rule.";
+      };
+    };
     perInstance =
-      { ... }:
+      { settings, ... }:
       {
         nixosModule =
           {
@@ -55,16 +62,15 @@
             dcAccessKeyPath = config.clan.core.vars.generators.data-commons-s3.files."access-key-id".path;
             dcSecretKeyPath = config.clan.core.vars.generators.data-commons-s3.files."secret-access-key".path;
 
-            # Browser presigned PUT/GET from the portal (origin
-            # http://data-commons.local, presigned host http://10.10.3.42:3900)
-            # is cross-origin, so the bucket needs a CORS rule. Garage exposes
+            # Browser presigned PUT/GET is cross-origin, so the bucket needs
+            # the selected portal origin (LAN or invited demo). Garage exposes
             # CORS only through the S3 PutBucketCors API — no CLI verb — so the
             # oneshot signs the call with curl's native SigV4 (same mechanism as
             # data-commons' devenv.nix). Full overwrite → idempotent.
             dcCorsXml = pkgs.writeText "data-commons-cors.xml" ''
               <CORSConfiguration>
                 <CORSRule>
-                  <AllowedOrigin>http://data-commons.local</AllowedOrigin>
+                  <AllowedOrigin>${settings.dataCommonsPortalOrigin}</AllowedOrigin>
                   <AllowedMethod>PUT</AllowedMethod>
                   <AllowedMethod>GET</AllowedMethod>
                   <AllowedHeader>*</AllowedHeader>

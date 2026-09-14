@@ -1,0 +1,35 @@
+{
+  "ingress": [
+    {
+      "hostname": "data-demo.fissio.com",
+      "path": "^/+(metrics|healthz)(/.*)?$",
+      "service": "http_status:404"
+    },
+    {
+      "hostname": "data-demo.fissio.com",
+      "service": "http://data-commons.data-commons.svc.cluster.local:4000",
+      "originRequest": { "httpHostHeader": "data-demo.fissio.com" }
+    },
+    {
+      "hostname": "demo-auth.fissio.com",
+      "path": "^/(realms/data-commons(/.*)?|resources/.*)$",
+      "service": "http://keycloak.data-commons.svc.cluster.local:80",
+      "originRequest": { "httpHostHeader": "demo-auth.fissio.com" }
+    },
+    {
+      "hostname": "demo-auth.fissio.com",
+      "service": "http_status:404"
+    },
+    {
+      "hostname": "demo-files.fissio.com",
+      "path": "^/data-commons/.*$",
+      "service": "http://10.10.3.42:3900",
+      "originRequest": { "httpHostHeader": "demo-files.fissio.com" }
+    },
+    {
+      "hostname": "demo-files.fissio.com",
+      "service": "http_status:404"
+    },
+    { "service": "http_status:404" }
+  ]
+}
