@@ -85,14 +85,27 @@
             # it is null (see "data-commons HelmChart" below) instead of
             # pinning a bogus digest that comin would auto-apply into an
             # ImagePullBackOff; the env/companion wiring still converges.
-            # 0.13.2 fixes browser uploads and retains HTTPS-aware probes.
-            # Keep the default LAN release unchanged.
-            chartVersion = if settings.internetDemo then "0.13.2" else "0.13.0";
+            # 0.14.0 adds the chart's ArgoRunner wiring (jobs.* env,
+            # ServiceAccount, namespace-scoped Role/RoleBinding — see the
+            # jobs pin below) and retains HTTPS-aware probes. Keep the
+            # default LAN release pinned to 0.13.0, which predates that
+            # wiring and stays on LocalRunner.
+            chartVersion = if settings.internetDemo then "0.14.0" else "0.13.0";
             imageDigest =
               if settings.internetDemo then
-                "sha256:2489fd113345d1aecc68ac3034190fae11606e9d3139bb72ee60cd5268c6f8af"
+                "sha256:bea60447091a14118c15eca1bf301e6f7b91c8f73041fbf82eb4b47356a42bab"
               else
                 "sha256:81656c772f33d0b5d51d58c53229ab7c482f18962c16723f9106d9c48a5a025f";
+
+            # Jobs pin (data-commons-gy4p): the demo profile runs its jobs
+            # through the kin-side Argo Workflows install (2.0.6 /
+            # v4.1.3, namespace-scoped, pinned unchanged below); LAN stays
+            # on the chart's default in-process LocalRunner since its
+            # pinned 0.13.0 chart predates jobs.* entirely. jobsImageDigest
+            # is the same v0.14.0 release's data-commons-jobs digest —
+            # immutable, never :latest.
+            jobsRunner = if settings.internetDemo then "argo" else "local";
+            jobsImageDigest = "sha256:e4a83c1ead7c19444401329b180c809da9ecf16b58b1a7f1fca85d7cda0023cf";
 
             # Companion image pins (update deliberately, they are decoupled
             # from app releases).
@@ -634,14 +647,21 @@
                     ingress:
                       enabled: ${lib.boolToString (!settings.internetDemo)}
                       host: ${portalHost}
-                    # Jobs stay on LocalRunner until a compatible published
-                    # app/chart/jobs release and its immutable jobs-image
-                    # digest are accepted. These values are staged for that
-                    # release; the pinned 0.13.0 chart may ignore them.
+                    # jobs.runner is argo only for the demo profile, on the
+                    # verified 0.14.0 chart/jobs-image release (jobsRunner /
+                    # jobsImageDigest above); the pinned LAN 0.13.0 chart
+                    # predates jobs.* and ignores this block, so it stays
+                    # effectively on LocalRunner. The commons pod's own
+                    # Workflow-management RBAC comes from the chart's
+                    # serviceAccount.create=true default (namespace-scoped
+                    # Role: workflows create/get/delete + Secrets create) —
+                    # nothing custom is declared in this module.
                     jobs:
-                      runner: local
+                      runner: ${jobsRunner}
                       argoNamespace: data-commons
                       jobServiceAccount: data-commons-job
+                      image:
+                        digest: ${jobsImageDigest}
                       runTtlSeconds: 7200
                       imagePullSecrets:
                         - ghcr-pull
