@@ -85,10 +85,14 @@
             # it is null (see "data-commons HelmChart" below) instead of
             # pinning a bogus digest that comin would auto-apply into an
             # ImagePullBackOff; the env/companion wiring still converges.
-            # 0.13.1 adds HTTPS-aware health probes; publish that chart before
-            # enabling the profile. The app image itself does not change.
-            chartVersion = if settings.internetDemo then "0.13.1" else "0.13.0";
-            imageDigest = "sha256:81656c772f33d0b5d51d58c53229ab7c482f18962c16723f9106d9c48a5a025f";
+            # 0.13.2 fixes browser uploads and retains HTTPS-aware probes.
+            # Keep the default LAN release unchanged.
+            chartVersion = if settings.internetDemo then "0.13.2" else "0.13.0";
+            imageDigest =
+              if settings.internetDemo then
+                "sha256:2489fd113345d1aecc68ac3034190fae11606e9d3139bb72ee60cd5268c6f8af"
+              else
+                "sha256:81656c772f33d0b5d51d58c53229ab7c482f18962c16723f9106d9c48a5a025f";
 
             # Companion image pins (update deliberately, they are decoupled
             # from app releases).
