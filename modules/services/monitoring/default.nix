@@ -241,10 +241,8 @@
                         # discovery — confirmed against the live cluster:
                         # `k3s kubectl -n data-commons get svc data-commons` has
                         # labels app.kubernetes.io/name=data-commons and a port
-                        # named `http` on 4000. Never exposed through the
-                        # data-commons.local Ingress (that chart's Ingress only
-                        # routes the app's own host rules) — cluster-internal scrape
-                        # only, matching the controller's no-session/no-auth stance.
+                        # named `http` on 4000. This scrape stays inside the cluster;
+                        # it does not depend on public or LAN ingress routing.
                         additionalScrapeConfigs:
                           - job_name: comin
                             kubernetes_sd_configs:
@@ -265,6 +263,11 @@
                                   names: [data-commons]
                             scheme: http
                             metrics_path: /metrics
+                            # Pods serve HTTP in both profiles. Match the health
+                            # probes so internet-demo mode does not redirect to HTTPS.
+                            http_headers:
+                              X-Forwarded-Proto:
+                                values: ["https"]
                             relabel_configs:
                               - source_labels: [__meta_kubernetes_service_name]
                                 action: keep
