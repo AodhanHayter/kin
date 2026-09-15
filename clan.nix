@@ -7,7 +7,7 @@
 # and roles are filled by the machine tags below. There is no snowfall-style
 # toggle layer; `modules` registers kin's own services, `module.input = "self"`
 # pulls them, and `module.input = "clan-core"` pulls upstream prebuilt ones.
-{ ... }:
+{ lib, ... }:
 let
   # Prepared only. Enabling requires the invited-demo migration/publication gate
   # in data-commons/docs/invited-demo.md; comin deploys pushed inventory changes.
@@ -72,6 +72,7 @@ in
     "kin/cnpg" = ./modules/services/cnpg;
     "kin/gen3" = ./modules/services/gen3;
     "kin/data-commons" = ./modules/services/data-commons;
+    "kin/jupyterhub" = ./modules/services/jupyterhub;
   };
 
   inventory.instances = {
@@ -217,6 +218,15 @@ in
       };
       roles.default.tags.k3s-server = { };
       roles.default.settings.internetDemo = dataCommonsInternetDemo;
+    };
+
+    # Notebook infrastructure is confined to the internet-demo profile.
+    jupyterhub = lib.mkIf dataCommonsInternetDemo {
+      module = {
+        name = "kin/jupyterhub";
+        input = "self";
+      };
+      roles.default.tags.k3s-server = { };
     };
 
     # ---- Garage S3 backup target (lenny only) ----

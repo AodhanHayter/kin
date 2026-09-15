@@ -30,6 +30,11 @@
       "hostname": "demo-files.fissio.com",
       "service": "http_status:404"
     },
+    {
+      "hostname": "demo-workspaces.fissio.com",
+      "service": "http://proxy-public.data-commons-workspaces.svc.cluster.local:80",
+      "originRequest": { "httpHostHeader": "demo-workspaces.fissio.com" }
+    },
     { "service": "http_status:404" }
   ]
 }

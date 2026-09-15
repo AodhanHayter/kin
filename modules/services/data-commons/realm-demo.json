@@ -26,6 +26,21 @@
         "backchannel.logout.session.required": "true",
         "backchannel.logout.revoke.offline.tokens": "false"
       }
+    },
+    {
+      "clientId": "jupyterhub",
+      "name": "Data Commons Notebooks",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "@JUPYTERHUB_CLIENT_SECRET@",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["https://demo-workspaces.fissio.com/hub/oauth_callback"],
+      "webOrigins": ["https://demo-workspaces.fissio.com"]
     }
   ],
   "users": [

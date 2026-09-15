@@ -90,10 +90,10 @@
             # jobs pin below) and retains HTTPS-aware probes. Keep the
             # default LAN release pinned to 0.13.0, which predates that
             # wiring and stays on LocalRunner.
-            chartVersion = if settings.internetDemo then "0.14.0" else "0.13.0";
+            chartVersion = if settings.internetDemo then "0.15.0" else "0.13.0";
             imageDigest =
               if settings.internetDemo then
-                "sha256:bea60447091a14118c15eca1bf301e6f7b91c8f73041fbf82eb4b47356a42bab"
+                "sha256:b493436b6a2c26acd3c168b8dbaa87d65bfabd63b1ae0b74a1c623199833ae3f"
               else
                 "sha256:81656c772f33d0b5d51d58c53229ab7c482f18962c16723f9106d9c48a5a025f";
 
@@ -953,7 +953,7 @@
                       ) "--from-literal=DC_API_BASE_URL=http://data-commons.data-commons.svc.cluster.local:4000"
                     } \
                     --from-literal=FGA_API_URL=http://openfga.data-commons.svc.cluster.local:8080 \
-                    --from-file=FGA_API_TOKEN=${fgaGen.files."api-token".path} \
+                    --from-file=FGA_API_TOKEN=${fgaGen.files."api-token".path} ${lib.optionalString settings.internetDemo "--from-literal=JUPYTERHUB_URL=https://demo-workspaces.fissio.com --from-file=JUPYTERHUB_API_TOKEN=${config.clan.core.vars.generators.data-commons-jupyterhub.files."hub-api-token".path} --from-literal=WORKSPACE_MAX_ACTIVE_SESSIONS_PER_USER=2"} \
                     --from-literal=AUTHZ_ADMIN_SUBS=${adminSub} \
                     --from-literal=S3_ENDPOINT=${garageEndpoint} \
                     --from-file=S3_ACCESS_KEY_ID=${s3Gen.files."access-key-id".path} \
@@ -1053,6 +1053,11 @@
                         ''
                           printf 's|@DEMO_ADMIN_PASSWORD@|%s|g\n' "$(cat ${
                             config.clan.core.vars.generators.data-commons-demo-admin.files."password".path
+                          })" >> "$sedprog"
+                          # Fresh imports only; existing realms need an explicit
+                          # client-only addition. Never replace the live realm.
+                          printf 's|@JUPYTERHUB_CLIENT_SECRET@|%s|g\n' "$(cat ${
+                            config.clan.core.vars.generators.data-commons-jupyterhub.files."oidc-client-secret".path
                           })" >> "$sedprog"
                         ''
                       else
