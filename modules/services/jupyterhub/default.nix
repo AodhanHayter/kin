@@ -102,6 +102,10 @@
                 # Providing it in valuesContent would leak it into the store.
               };
               singleuser = {
+                # k3s enforces this NetworkPolicy. Avoid the privileged init
+                # container: its legacy iptables filter table is absent on NixOS.
+                cloudMetadata.blockWithIptables = false;
+                networkPolicy.egressAllowRules.cloudMetadataServer = false;
                 image = {
                   name =
                     "ghcr.io/fissioai/data-commons-workspace"

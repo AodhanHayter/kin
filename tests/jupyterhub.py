@@ -3,6 +3,7 @@
 import asyncio
 import base64
 import inspect
+from ipaddress import ip_address, ip_network
 import json
 import os
 from pathlib import Path
@@ -108,6 +109,7 @@ assert all(first.environment[key] == value for key, value in valid.items())
 with patch.object(first, "get_env", return_value=first.environment):
     pod = asyncio.run(first.get_pod_manifest())
 assert pod.spec.automount_service_account_token is False
+assert not pod.spec.init_containers, "Use enforced NetworkPolicy, not privileged legacy iptables"
 assert pod.spec.security_context["fsGroup"] == 1000
 assert pod.spec.security_context["seccompProfile"]["type"] == "RuntimeDefault"
 container = pod.spec.containers[0]
@@ -149,7 +151,21 @@ assert all(r["spec"].get("type", "ClusterIP") == "ClusterIP" for r in services)
 assert any(r["metadata"]["name"] == "proxy-public" for r in services)
 assert not any(r and r["kind"] == "Ingress" for r in resources)
 policies = [r for r in resources if r and r["kind"] == "NetworkPolicy"]
-assert any(r["metadata"]["name"] == "singleuser" for r in policies)
+singleuser_policy, = [r["spec"] for r in policies if r["metadata"]["name"] == "singleuser"]
+assert "Egress" in singleuser_policy["policyTypes"]
+metadata_ip = ip_address("169.254.169.254")
+for rule in singleuser_policy["egress"]:
+    if rule.get("ports") and not any(p.get("protocol", "TCP") == "TCP" and p["port"] == 80
+                                      for p in rule["ports"]):
+        continue
+    assert rule.get("to"), "Unrestricted metadata HTTP egress"
+    for peer in rule["to"]:
+        if block := peer.get("ipBlock"):
+            assert metadata_ip not in ip_network(block["cidr"]) or any(
+                metadata_ip in ip_network(excluded) for excluded in block.get("except", [])
+            ), "Metadata HTTP egress must stay blocked"
+        else:
+            assert peer.get("podSelector"), "Unrestricted metadata HTTP destination"
 hub_deploy, = [r for r in resources if r and r["kind"] == "Deployment" and r["metadata"]["name"] == "hub"]
 assert hub_deploy["spec"]["strategy"]["type"] == "Recreate"
 print("JupyterHub contracts pass: admin-only, portal-only launch, retained shared home, bounded resources.")
