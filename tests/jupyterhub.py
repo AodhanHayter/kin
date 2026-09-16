@@ -84,6 +84,8 @@ assert not auth.admin_users
 # Use upstream scope expansion, not a string approximation of the user role.
 scopes = expand_scopes(hub["loadRoles"]["user"]["scopes"], owner=orm.User(name="dc-admin"))
 assert "access:servers!user=dc-admin" in scopes
+# Hub's notebook OAuth code exchange always requests these identity scopes.
+assert {"read:users:name!user=dc-admin", "read:users:groups!user=dc-admin"} <= scopes
 assert not any(scope.split("!")[0] in {"servers", "delete:servers", "admin:servers", "admin:users"}
                for scope in scopes), scopes
 assert all("!user=dc-admin" in scope for scope in hub["loadRoles"]["data-commons-launcher"]["scopes"])

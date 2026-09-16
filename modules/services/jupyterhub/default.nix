@@ -81,6 +81,9 @@
                   # Humans may open notebooks, but only the portal may launch
                   # or stop them. The hook below validates, not authenticates.
                   user.scopes = [
+                    # Required by the notebook OAuth code exchange.
+                    "read:users:name!user"
+                    "read:users:groups!user"
                     "access:servers!user"
                     "users:activity!user"
                   ];
