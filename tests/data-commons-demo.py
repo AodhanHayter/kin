@@ -20,7 +20,8 @@ assert [user["username"] for user in realm["users"]] == ["dc-admin"]
 assert realm["users"][0]["id"] == lan_realm["users"][0]["id"]
 assert realm["users"][0]["credentials"][0]["value"] == "@DEMO_ADMIN_PASSWORD@"
 clients = {client["clientId"]: client for client in realm["clients"]}
-assert set(clients) == {"data-commons-portal", "jupyterhub"}
+assert len(realm["clients"]) == len(clients) == 3
+assert set(clients) == {"data-commons-portal", "jupyterhub", "data-commons-cli"}
 client = clients["data-commons-portal"]
 assert client["publicClient"] is False
 assert client["directAccessGrantsEnabled"] is False
@@ -38,6 +39,28 @@ assert notebooks["implicitFlowEnabled"] is False
 assert notebooks["secret"] == "@JUPYTERHUB_CLIENT_SECRET@"
 assert notebooks["redirectUris"] == ["https://demo-workspaces.fissio.com/hub/oauth_callback"]
 assert notebooks["webOrigins"] == ["https://demo-workspaces.fissio.com"]
+
+cli = clients["data-commons-cli"]
+assert cli["enabled"] is True
+assert cli["protocol"] == "openid-connect"
+assert cli["publicClient"] is True
+assert "secret" not in cli
+for grant in ["standardFlowEnabled", "implicitFlowEnabled", "directAccessGrantsEnabled", "serviceAccountsEnabled"]:
+    assert cli[grant] is False, grant
+assert cli["redirectUris"] == []
+assert cli["webOrigins"] == []
+assert cli["attributes"] == {"oauth2.device.authorization.grant.enabled": "true"}
+assert cli["protocolMappers"] == [{
+    "name": "portal-audience",
+    "protocol": "openid-connect",
+    "protocolMapper": "oidc-audience-mapper",
+    "consentRequired": False,
+    "config": {
+        "included.client.audience": client["clientId"],
+        "id.token.claim": "false",
+        "access.token.claim": "true",
+    },
+}]
 assert rules[-1] == {"service": "http_status:404"}
 
 
@@ -52,7 +75,9 @@ for host, paths, origin in [
     (portal, ["/", "/auth/callback", "/auth/backchannel-logout", "/live/websocket", "/api/user"],
      "http://data-commons.data-commons.svc.cluster.local:4000"),
     (auth, ["/realms/data-commons/.well-known/openid-configuration",
-            "/realms/data-commons/protocol/openid-connect/token", "/resources/theme/login.css"],
+            "/realms/data-commons/protocol/openid-connect/token",
+            "/realms/data-commons/protocol/openid-connect/auth/device",
+            "/realms/data-commons/device", "/resources/theme/login.css"],
      "http://keycloak.data-commons.svc.cluster.local:80"),
     (files, ["/data-commons/objects/a.csv"], "http://10.10.3.42:3900"),
     ("demo-workspaces.fissio.com", ["/hub/oauth_callback", "/user/dc-admin/session/api/kernels/1/channels"],
