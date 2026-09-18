@@ -26,7 +26,7 @@
           let
             # Bump to the current release; check
             # https://hub.docker.com/r/cloudflare/cloudflared/tags
-            image = "cloudflare/cloudflared:2025.11.1";
+            image = "cloudflare/cloudflared:2026.9.1";
             namespace = "cloudflared";
             secretName = "tunnel-token";
 
