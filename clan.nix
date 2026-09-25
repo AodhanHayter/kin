@@ -71,7 +71,6 @@ in
     "kin/kotaemon" = ./modules/services/kotaemon;
     "kin/comin" = ./modules/services/comin;
     "kin/cnpg" = ./modules/services/cnpg;
-    "kin/gen3" = ./modules/services/gen3;
     "kin/data-commons" = ./modules/services/data-commons;
     "kin/jupyterhub" = ./modules/services/jupyterhub;
   };
@@ -197,15 +196,6 @@ in
     cnpg = {
       module = {
         name = "kin/cnpg";
-        input = "self";
-      };
-      roles.default.tags.k3s-server = { };
-    };
-
-    # ---- Gen3 data-commons lab: dev mode, mock auth, LAN-only (server only) ----
-    gen3 = {
-      module = {
-        name = "kin/gen3";
         input = "self";
       };
       roles.default.tags.k3s-server = { };

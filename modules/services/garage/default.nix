@@ -124,8 +124,8 @@
             # never resolves on the LAN — which breaks EVERY presigned
             # upload/download, since the host is part of the SigV4 signature
             # and has no fallback. Same flag, same reason, as
-            # modules/services/monitoring and modules/services/gen3 (which
-            # only ever needed it because they land on atlas).
+            # modules/services/monitoring (which only ever needed it because
+            # it lands on atlas).
             services.avahi.publish.userServices = true;
             systemd.services.avahi-alias-s3 = {
               description = "mDNS alias s3.local -> lenny (this host)";
