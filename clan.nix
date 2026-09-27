@@ -71,6 +71,7 @@ in
     "kin/kotaemon" = ./modules/services/kotaemon;
     "kin/comin" = ./modules/services/comin;
     "kin/cnpg" = ./modules/services/cnpg;
+    "kin/alfresco" = ./modules/services/alfresco;
     "kin/data-commons" = ./modules/services/data-commons;
     "kin/jupyterhub" = ./modules/services/jupyterhub;
   };
@@ -187,6 +188,15 @@ in
     monitoring = {
       module = {
         name = "kin/monitoring";
+        input = "self";
+      };
+      roles.default.tags.k3s-server = { };
+    };
+
+    # ---- Alfresco Community test instance (LAN only) ----
+    alfresco = {
+      module = {
+        name = "kin/alfresco";
         input = "self";
       };
       roles.default.tags.k3s-server = { };
