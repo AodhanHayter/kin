@@ -23,6 +23,13 @@
     HandleLidSwitchExternalPower = "ignore";
     HandleLidSwitchDocked = "ignore";
   };
+  # Spurious ACPI sleep-key events suspended it at boot — disable sleep outright.
+  systemd.targets = {
+    sleep.enable = false;
+    suspend.enable = false;
+    hibernate.enable = false;
+    hybrid-sleep.enable = false;
+  };
 
   system.stateVersion = "24.05";
 }
