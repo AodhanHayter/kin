@@ -20,6 +20,13 @@
     HandleLidSwitchExternalPower = "ignore";
     HandleLidSwitchDocked = "ignore";
   };
+  # Headless: no trigger (sleep key, idle, etc.) may suspend it either.
+  systemd.targets = {
+    sleep.enable = false;
+    suspend.enable = false;
+    hibernate.enable = false;
+    hybrid-sleep.enable = false;
+  };
 
   system.stateVersion = "24.05";
 }
