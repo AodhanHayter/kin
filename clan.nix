@@ -66,14 +66,10 @@ in
     "kin/nix-cache" = ./modules/services/nix-cache;
     "kin/attic" = ./modules/services/attic;
     "kin/cloudflared" = ./modules/services/cloudflared;
-    "kin/hello" = ./modules/services/hello;
     "kin/ipa-rfp-model" = ./modules/services/ipa-rfp-model;
-    "kin/kotaemon" = ./modules/services/kotaemon;
     "kin/comin" = ./modules/services/comin;
     "kin/cnpg" = ./modules/services/cnpg;
-    "kin/alfresco" = ./modules/services/alfresco;
     "kin/data-commons" = ./modules/services/data-commons;
-    "kin/jupyterhub" = ./modules/services/jupyterhub;
   };
 
   inventory.instances = {
@@ -193,15 +189,6 @@ in
       roles.default.tags.k3s-server = { };
     };
 
-    # ---- Alfresco Community test instance (LAN only) ----
-    alfresco = {
-      module = {
-        name = "kin/alfresco";
-        input = "self";
-      };
-      roles.default.tags.k3s-server = { };
-    };
-
     # ---- CloudNativePG operator: on-demand Postgres (server only) ----
     cnpg = {
       module = {
@@ -219,15 +206,6 @@ in
       };
       roles.default.tags.k3s-server = { };
       roles.default.settings.internetDemo = dataCommonsInternetDemo;
-    };
-
-    # Notebook infrastructure is confined to the internet-demo profile.
-    jupyterhub = lib.mkIf dataCommonsInternetDemo {
-      module = {
-        name = "kin/jupyterhub";
-        input = "self";
-      };
-      roles.default.tags.k3s-server = { };
     };
 
     # ---- Garage S3 backup target (lenny only) ----
@@ -259,28 +237,10 @@ in
       roles.default.tags.k3s-server = { };
     };
 
-    # ---- hello demo origin behind the tunnel (server applies manifests) ----
-    hello = {
-      module = {
-        name = "kin/hello";
-        input = "self";
-      };
-      roles.default.tags.k3s-server = { };
-    };
-
     # ---- IPA RFP financial model behind the tunnel (server applies manifests) ----
     ipa-rfp-model = {
       module = {
         name = "kin/ipa-rfp-model";
-        input = "self";
-      };
-      roles.default.tags.k3s-server = { };
-    };
-
-    # ---- kotaemon RAG UI behind the tunnel (server applies manifests) ----
-    kotaemon = {
-      module = {
-        name = "kin/kotaemon";
         input = "self";
       };
       roles.default.tags.k3s-server = { };

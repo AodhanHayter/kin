@@ -20,8 +20,8 @@ assert [user["username"] for user in realm["users"]] == ["dc-admin"]
 assert realm["users"][0]["id"] == lan_realm["users"][0]["id"]
 assert realm["users"][0]["credentials"][0]["value"] == "@DEMO_ADMIN_PASSWORD@"
 clients = {client["clientId"]: client for client in realm["clients"]}
-assert len(realm["clients"]) == len(clients) == 3
-assert set(clients) == {"data-commons-portal", "jupyterhub", "data-commons-cli"}
+assert len(realm["clients"]) == len(clients) == 2
+assert set(clients) == {"data-commons-portal", "data-commons-cli"}
 client = clients["data-commons-portal"]
 assert client["publicClient"] is False
 assert client["directAccessGrantsEnabled"] is False
@@ -31,14 +31,6 @@ assert client["attributes"]["post.logout.redirect.uris"] == f"https://{portal}/"
 assert client["attributes"]["backchannel.logout.url"] == f"https://{portal}/auth/backchannel-logout"
 assert "@USER_PASSWORD@" not in json.dumps(realm)
 assert ".local" not in json.dumps(client)
-notebooks = clients["jupyterhub"]
-assert notebooks["publicClient"] is False
-assert notebooks["directAccessGrantsEnabled"] is False
-assert notebooks["serviceAccountsEnabled"] is False
-assert notebooks["implicitFlowEnabled"] is False
-assert notebooks["secret"] == "@JUPYTERHUB_CLIENT_SECRET@"
-assert notebooks["redirectUris"] == ["https://demo-workspaces.fissio.com/hub/oauth_callback"]
-assert notebooks["webOrigins"] == ["https://demo-workspaces.fissio.com"]
 
 cli = clients["data-commons-cli"]
 assert cli["enabled"] is True
@@ -80,8 +72,6 @@ for host, paths, origin in [
             "/realms/data-commons/device", "/resources/theme/login.css"],
      "http://keycloak.data-commons.svc.cluster.local:80"),
     (files, ["/data-commons/objects/a.csv"], "http://10.10.3.42:3900"),
-    ("demo-workspaces.fissio.com", ["/hub/oauth_callback", "/user/dc-admin/session/api/kernels/1/channels"],
-     "http://proxy-public.data-commons-workspaces.svc.cluster.local:80"),
 ]:
     for path in paths:
         rule = route(host, path)

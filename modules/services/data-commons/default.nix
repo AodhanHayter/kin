@@ -953,7 +953,7 @@
                       ) "--from-literal=DC_API_BASE_URL=http://data-commons.data-commons.svc.cluster.local:4000"
                     } \
                     --from-literal=FGA_API_URL=http://openfga.data-commons.svc.cluster.local:8080 \
-                    --from-file=FGA_API_TOKEN=${fgaGen.files."api-token".path} ${lib.optionalString settings.internetDemo "--from-literal=JUPYTERHUB_URL=https://demo-workspaces.fissio.com --from-file=JUPYTERHUB_API_TOKEN=${config.clan.core.vars.generators.data-commons-jupyterhub.files."hub-api-token".path} --from-literal=WORKSPACE_MAX_ACTIVE_SESSIONS_PER_USER=2"} \
+                    --from-file=FGA_API_TOKEN=${fgaGen.files."api-token".path} ${lib.optionalString settings.internetDemo "--from-literal=WORKSPACE_MAX_ACTIVE_SESSIONS_PER_USER=2"} \
                     --from-literal=AUTHZ_ADMIN_SUBS=${adminSub} \
                     --from-literal=S3_ENDPOINT=${garageEndpoint} \
                     --from-file=S3_ACCESS_KEY_ID=${s3Gen.files."access-key-id".path} \
@@ -1053,11 +1053,6 @@
                         ''
                           printf 's|@DEMO_ADMIN_PASSWORD@|%s|g\n' "$(cat ${
                             config.clan.core.vars.generators.data-commons-demo-admin.files."password".path
-                          })" >> "$sedprog"
-                          # Fresh imports only; existing realms need an explicit
-                          # client-only addition. Never replace the live realm.
-                          printf 's|@JUPYTERHUB_CLIENT_SECRET@|%s|g\n' "$(cat ${
-                            config.clan.core.vars.generators.data-commons-jupyterhub.files."oidc-client-secret".path
                           })" >> "$sedprog"
                         ''
                       else

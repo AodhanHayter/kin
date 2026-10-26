@@ -13,7 +13,7 @@
 # app (each browser session gets its own kernel, so concurrent viewers don't
 # stomp each other's sliders).
 #
-# Exposure (manual, Cloudflare Zero Trust dashboard — same as hello):
+# Exposure (manual, Cloudflare Zero Trust dashboard):
 #   1. Tunnel public hostname:  ipa-rfp-model.<domain> ->
 #        http://ipa-rfp-model.ipa-rfp-model.svc.cluster.local:80
 #   2. Access application on ipa-rfp-model.<domain> with an email allow-list.
