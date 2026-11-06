@@ -67,6 +67,7 @@ in
     "kin/attic" = ./modules/services/attic;
     "kin/cloudflared" = ./modules/services/cloudflared;
     "kin/ipa-rfp-model" = ./modules/services/ipa-rfp-model;
+    "kin/gl-trueup" = ./modules/services/gl-trueup;
     "kin/comin" = ./modules/services/comin;
     "kin/cnpg" = ./modules/services/cnpg;
     "kin/data-commons" = ./modules/services/data-commons;
@@ -244,6 +245,17 @@ in
         input = "self";
       };
       roles.default.tags.k3s-server = { };
+    };
+
+    # ---- HTS GL true-up app behind the tunnel (server applies manifests) ----
+    gl-trueup = {
+      module = {
+        name = "kin/gl-trueup";
+        input = "self";
+      };
+      roles.default.tags.k3s-server = { };
+      # From the hitech-data Image workflow summary; null = no Deployment yet.
+      roles.default.settings.imageDigest = null;
     };
 
     # ---- harmonia binary cache: atlas serves, every node substitutes ----
