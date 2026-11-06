@@ -25,8 +25,9 @@
 #       `cf tunnels config update` replaces ALL rules, so get + edit + put)
 #   * proxied CNAME gl-trueup.fissio.com -> <tunnel id>.cfargotunnel.com
 #   * Access app "gl-trueup": One-time PIN only, inline Allow policy
-#     "HTS accountants" (email list). Change the list with
-#     `cf zero-trust access applications update`. marimo run has no auth of
+#     "HTS accountants" (email list). Its definition + runbook live in
+#     hitech-data (deploy/cloudflare-access.json, docs/gl-trueup.md › Deploy;
+#     private repo, so emails stay out of here). marimo run has no auth of
 #     its own: never route the hostname without this app.
 #
 # Seeding tokens / reconnecting QBO: see "Deploy" in hitech-data's
