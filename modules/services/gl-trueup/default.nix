@@ -18,11 +18,16 @@
 # Image: set `imageDigest` on the instance in clan.nix from the hitech-data
 # Image workflow run summary. While null, the Deployment is not applied.
 #
-# Exposure (manual, Cloudflare Zero Trust dashboard):
-#   1. Tunnel public hostname: gl-trueup.fissio.com ->
-#        http://gl-trueup.gl-trueup.svc.cluster.local:80
-#   2. Access application on gl-trueup.fissio.com, One-time PIN, email
-#      allow-list. Do NOT skip step 2: marimo run has no auth of its own.
+# Exposure (Cloudflare, personal account; created with the `cf` CLI, not
+# managed here):
+#   * tunnel kin-homelab ingress rule gl-trueup.fissio.com ->
+#       http://gl-trueup.gl-trueup.svc.cluster.local:80 (before the catch-all;
+#       `cf tunnels config update` replaces ALL rules, so get + edit + put)
+#   * proxied CNAME gl-trueup.fissio.com -> <tunnel id>.cfargotunnel.com
+#   * Access app "gl-trueup": One-time PIN only, inline Allow policy
+#     "HTS accountants" (email list). Change the list with
+#     `cf zero-trust access applications update`. marimo run has no auth of
+#     its own: never route the hostname without this app.
 #
 # Seeding tokens / reconnecting QBO: see "Deploy" in hitech-data's
 # docs/gl-trueup.md.
