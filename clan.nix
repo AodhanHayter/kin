@@ -254,8 +254,8 @@ in
         input = "self";
       };
       roles.default.tags.k3s-server = { };
-      # From the hitech-data Image workflow summary; null = no Deployment yet.
-      roles.default.settings.imageDigest = null;
+      # From the hitech-data Image workflow summary (null = no Deployment).
+      roles.default.settings.imageDigest = "sha256:4c53c41ec40eb38dcf6b4362d9643d17bcad659ff0e9c65a66bf1b0b65282ced";
     };
 
     # ---- harmonia binary cache: atlas serves, every node substitutes ----
