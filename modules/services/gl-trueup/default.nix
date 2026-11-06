@@ -19,9 +19,9 @@
 # Image workflow run summary. While null, the Deployment is not applied.
 #
 # Exposure (manual, Cloudflare Zero Trust dashboard):
-#   1. Tunnel public hostname: gl-trueup.<domain> ->
+#   1. Tunnel public hostname: gl-trueup.fissio.com ->
 #        http://gl-trueup.gl-trueup.svc.cluster.local:80
-#   2. Access application on gl-trueup.<domain>, One-time PIN, email
+#   2. Access application on gl-trueup.fissio.com, One-time PIN, email
 #      allow-list. Do NOT skip step 2: marimo run has no auth of its own.
 #
 # Seeding tokens / reconnecting QBO: see "Deploy" in hitech-data's
