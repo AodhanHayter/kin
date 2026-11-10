@@ -29,11 +29,19 @@
             ];
             networking.firewall.allowedUDPPorts = [ 5353 ];
 
-            # Keep atlas.local; publish an additional name for the admin UI.
-            environment.etc."avahi/hosts".text = "10.10.3.100 homebridge.local\n";
-            systemd.services.avahi-daemon.restartTriggers = [
-              config.environment.etc."avahi/hosts".source
-            ];
+            systemd.services.homebridge-mdns = {
+              description = "Publish homebridge.local without replacing atlas.local";
+              wantedBy = [ "multi-user.target" ];
+              wants = [ "avahi-daemon.service" ];
+              after = [ "avahi-daemon.service" ];
+              serviceConfig = {
+                # A reverse record for this IP already belongs to atlas.local.
+                ExecStart = "${config.services.avahi.package}/bin/avahi-publish-address --no-fail --no-reverse homebridge.local 10.10.3.100";
+                DynamicUser = true;
+                Restart = "on-failure";
+                RestartSec = 5;
+              };
+            };
 
             services.k3s.manifests.homebridge.content = [
               {
