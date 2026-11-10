@@ -2,9 +2,11 @@
 
 Homebridge runs as one k3s pod on `atlas` (`10.10.3.100`).
 `kin/homebridge` deploys it through the `k3s-server` inventory tag.
-The admin UI is `http://homebridge.local:8581`. There is no public route or ingress.
+The admin UI is `http://homebridge.local`, with no port in the URL.
+The existing Traefik proxy routes this hostname on port 80 to the Homebridge UI on port 8581.
+There is no public route or HTTPS certificate for this name.
 Atlas publishes `homebridge.local` as an additional mDNS name for `10.10.3.100`.
-The existing `http://atlas.local:8581` and direct IP address still work.
+Direct access through `http://atlas.local:8581` and `http://10.10.3.100:8581` still works.
 The alias uses local multicast discovery, not a UniFi DNS record, and does not change firewall access.
 
 The pod shares the host network so Apple Home can discover it.
@@ -45,8 +47,9 @@ The `WiFi to Homebridge` policy is installed above the Internal-to-Homelab block
 | Destination port | `51826` |
 | Return traffic | Allow established replies |
 
-Keep port `8581` restricted to the existing admin machines.
-The NixOS host firewall opens `8581`, `51826`, and UDP `5353`; UniFi controls access between networks.
+Keep UI access on ports `80` and `8581` restricted to the existing admin machines.
+Traefik already serves port `80`; this change does not open additional host or UniFi firewall ports.
+The Homebridge module opens `8581`, `51826`, and UDP `5353`; UniFi controls access between networks.
 Do not enable a broad Internal-to-Homelab allow rule.
 
 Homelab-to-Internal traffic is also blocked. Plugins that contact local devices need separate outbound rules for their device IPs and ports.
@@ -89,12 +92,22 @@ The repo commits remain local. Publish them to `master` before relying on future
    The volume must be Bound and the pod must be Ready on atlas.
    First startup installs packages and requires internet access.
 
-4. From an allowed admin machine, open `http://homebridge.local:8581` and complete account setup.
+4. From an allowed admin machine, open `http://homebridge.local` and complete account setup.
 5. Install the plugins you need in the UI. Keep the main bridge port at `51826` and the advertiser at `ciao`.
 6. After the UniFi rule is active, scan the Homebridge QR code from Apple Home on your iPhone.
 
 Keep atlas at `10.10.3.100` with a DHCP reservation.
 If its address changes, update the saved bridge binding, the Avahi alias in `modules/services/homebridge/default.nix`, and the UniFi destination rule.
+
+## Reuse the shared proxy
+
+Other web services can use the same Traefik instance. Each service needs a hostname, a Kubernetes Service pointing to its application port, and an Ingress routing that hostname to the Service.
+Keep these resources in the service's own clan module, as `kin/homebridge` does.
+No additional proxy installation is needed.
+
+Hostname resolution and access rules are separate from proxy routing.
+Keep admin interfaces restricted, even when a service's device-control port is open to WiFi clients.
+HomeKit traffic still uses port `51826` directly and does not pass through this HTTP route.
 
 ## Data and recovery
 

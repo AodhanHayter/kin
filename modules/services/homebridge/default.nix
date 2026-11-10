@@ -152,6 +152,51 @@
                   };
                 };
               }
+              {
+                apiVersion = "v1";
+                kind = "Service";
+                metadata = {
+                  name = "homebridge";
+                  namespace = "homebridge";
+                };
+                spec = {
+                  selector.app = "homebridge";
+                  ports = [
+                    {
+                      name = "http";
+                      port = 80;
+                      targetPort = "ui";
+                    }
+                  ];
+                };
+              }
+              {
+                apiVersion = "networking.k8s.io/v1";
+                kind = "Ingress";
+                metadata = {
+                  name = "homebridge";
+                  namespace = "homebridge";
+                  annotations."traefik.ingress.kubernetes.io/router.entrypoints" = "web";
+                };
+                spec = {
+                  ingressClassName = "traefik";
+                  rules = [
+                    {
+                      host = "homebridge.local";
+                      http.paths = [
+                        {
+                          path = "/";
+                          pathType = "Prefix";
+                          backend.service = {
+                            name = "homebridge";
+                            port.number = 80;
+                          };
+                        }
+                      ];
+                    }
+                  ];
+                };
+              }
             ];
           };
       };

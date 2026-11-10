@@ -25,7 +25,22 @@ config = json.loads(subprocess.check_output([
     """,
 ], cwd=root))
 resources = {resource["kind"]: resource for resource in config["manifests"]}
-assert set(resources) == {"Namespace", "PersistentVolumeClaim", "Deployment"}
+assert set(resources) == {"Namespace", "PersistentVolumeClaim", "Deployment", "Service", "Ingress"}
+service = resources["Service"]["spec"]
+assert service.get("type", "ClusterIP") == "ClusterIP"
+assert service["selector"] == {"app": "homebridge"}
+assert service["ports"] == [{"name": "http", "port": 80, "targetPort": "ui"}]
+ingress = resources["Ingress"]
+assert ingress["spec"]["ingressClassName"] == "traefik"
+assert ingress["metadata"]["annotations"]["traefik.ingress.kubernetes.io/router.entrypoints"] == "web"
+assert ingress["spec"]["rules"] == [{
+    "host": "homebridge.local",
+    "http": {"paths": [{
+        "path": "/",
+        "pathType": "Prefix",
+        "backend": {"service": {"name": "homebridge", "port": {"number": 80}}},
+    }]},
+}]
 pvc = resources["PersistentVolumeClaim"]["spec"]
 assert pvc["storageClassName"] == "longhorn"
 assert pvc["accessModes"] == ["ReadWriteOnce"]
@@ -38,6 +53,7 @@ assert pod["dnsPolicy"] == "ClusterFirstWithHostNet"
 assert pod["nodeSelector"] == {"kubernetes.io/hostname": "atlas"}
 assert pod["automountServiceAccountToken"] is False
 container = pod["containers"][0]
+assert next(port for port in container["ports"] if port["name"] == "ui")["containerPort"] == 8581
 bootstrap = pod["initContainers"][0]
 assert container["image"] == bootstrap["image"] == "homebridge/homebridge:2026-11-02"
 assert {e["name"]: e["value"] for e in container["env"]}["ENABLE_AVAHI"] == "0"
