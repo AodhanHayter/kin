@@ -28,14 +28,14 @@ Gateway mDNS Proxy was set to **Auto**. This forwards common discovery traffic b
 Internal-to-Homelab traffic was blocked except for three admin IPs: `10.10.1.8`, `10.10.0.252`, and `10.10.0.44`.
 Those exceptions already permit access to the admin UI.
 
-Before pairing, add this narrow UniFi firewall policy above the Internal-to-Homelab block:
+The `WiFi to Homebridge` policy is installed above the Internal-to-Homelab block:
 
 | Field | Value |
 | --- | --- |
 | Action | Allow |
 | Protocol | TCP |
 | Source zone | Internal |
-| Source network | WiFi (`10.10.1.0/24`) |
+| Source IP/subnet | `10.10.1.0/24` (WiFi) |
 | Source port | Any |
 | Destination zone | Homelab |
 | Destination IP | `10.10.3.100` |
@@ -51,7 +51,12 @@ Cloud-only plugins can use the existing internet access.
 Child bridges need distinct, fixed TCP ports plus corresponding NixOS and UniFi rules before pairing.
 This configuration opens only the main bridge port.
 
-No UniFi settings were changed during setup. Discovery and pairing require a live test after deployment.
+With approval on 2026-11-10, setup added this policy and its return-traffic rule, then deployed atlas through `clan machines update atlas`.
+The pod is Ready, the volume is Bound, and both the UI and HomeKit listener respond.
+Discovery resolves to `10.10.3.100:51826` from the Default network.
+The UI shows its first-run setup screen. Account setup, plugins, and pairing from an iPhone remain manual.
+
+The repo commits remain local. Publish them to `master` before relying on future comin deployments to preserve this configuration.
 
 ## Deploy and pair
 
