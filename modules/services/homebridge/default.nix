@@ -29,6 +29,12 @@
             ];
             networking.firewall.allowedUDPPorts = [ 5353 ];
 
+            # Keep atlas.local; publish an additional name for the admin UI.
+            environment.etc."avahi/hosts".text = "10.10.3.100 homebridge.local\n";
+            systemd.services.avahi-daemon.restartTriggers = [
+              config.environment.etc."avahi/hosts".source
+            ];
+
             services.k3s.manifests.homebridge.content = [
               {
                 apiVersion = "v1";

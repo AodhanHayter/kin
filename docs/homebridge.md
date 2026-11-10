@@ -2,7 +2,10 @@
 
 Homebridge runs as one k3s pod on `atlas` (`10.10.3.100`).
 `kin/homebridge` deploys it through the `k3s-server` inventory tag.
-The admin UI is `http://10.10.3.100:8581`. There is no public route or ingress.
+The admin UI is `http://homebridge.local:8581`. There is no public route or ingress.
+Atlas publishes `homebridge.local` as an additional mDNS name for `10.10.3.100`.
+The existing `http://atlas.local:8581` and direct IP address still work.
+The alias uses local multicast discovery, not a UniFi DNS record, and does not change firewall access.
 
 The pod shares the host network so Apple Home can discover it.
 A 5 GiB Longhorn persistent volume stores `/homebridge`, including plugins, credentials, and pairing data.
@@ -86,12 +89,12 @@ The repo commits remain local. Publish them to `master` before relying on future
    The volume must be Bound and the pod must be Ready on atlas.
    First startup installs packages and requires internet access.
 
-4. From an allowed admin machine, open `http://10.10.3.100:8581` and complete account setup.
+4. From an allowed admin machine, open `http://homebridge.local:8581` and complete account setup.
 5. Install the plugins you need in the UI. Keep the main bridge port at `51826` and the advertiser at `ciao`.
 6. After the UniFi rule is active, scan the Homebridge QR code from Apple Home on your iPhone.
 
 Keep atlas at `10.10.3.100` with a DHCP reservation.
-If its address changes, update the saved bridge binding and the UniFi destination rule before restarting Homebridge.
+If its address changes, update the saved bridge binding, the Avahi alias in `modules/services/homebridge/default.nix`, and the UniFi destination rule.
 
 ## Data and recovery
 
