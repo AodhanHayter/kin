@@ -61,6 +61,7 @@ in
     "kin/k3s" = ./modules/services/k3s;
     "kin/tailscale" = ./modules/services/tailscale;
     "kin/monitoring" = ./modules/services/monitoring;
+    "kin/homebridge" = ./modules/services/homebridge;
     "kin/garage" = ./modules/services/garage;
     "kin/github-runners" = ./modules/services/github-runners;
     "kin/nix-cache" = ./modules/services/nix-cache;
@@ -185,6 +186,15 @@ in
     monitoring = {
       module = {
         name = "kin/monitoring";
+        input = "self";
+      };
+      roles.default.tags.k3s-server = { };
+    };
+
+    # ---- Homebridge: host networking + persistent data on the server ----
+    homebridge = {
+      module = {
+        name = "kin/homebridge";
         input = "self";
       };
       roles.default.tags.k3s-server = { };

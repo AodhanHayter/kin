@@ -139,6 +139,11 @@ home-manager, neovim/tmux/zsh/prezto, fonts, and determinate-nix (with its
 `eval-cores`/snowfall-FUP nix options). GlusterFS peering + volume creation
 remain manual (out-of-band).
 
+## Homebridge
+
+See [Homebridge setup](docs/homebridge.md) for deployment, UniFi firewall rules,
+Apple Home pairing, and backups.
+
 ## Git hooks
 
 `devenv shell` installs pre-commit hooks (defined in `devenv.nix` via
