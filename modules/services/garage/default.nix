@@ -16,15 +16,8 @@
 
   roles.default = {
     description = "Run a Garage S3 node (backup target) on this machine.";
-    interface = { lib, ... }: {
-      options.dataCommonsPortalOrigin = lib.mkOption {
-        type = lib.types.str;
-        default = "http://data-commons.local";
-        description = "Exact portal origin allowed by the data-commons bucket CORS rule.";
-      };
-    };
     perInstance =
-      { settings, ... }:
+      { ... }:
       {
         nixosModule =
           {
@@ -56,28 +49,6 @@
             rpcEnvPath = config.clan.core.vars.generators.garage-rpc-secret.files."env".path;
             accessKeyPath = config.clan.core.vars.generators.garage-backup-key.files."access-key-id".path;
             secretKeyPath = config.clan.core.vars.generators.garage-backup-key.files."secret-access-key".path;
-
-            # App-scoped key for the data-commons object store (shared var, so
-            # atlas hands the same id/secret to the app pods).
-            dcAccessKeyPath = config.clan.core.vars.generators.data-commons-s3.files."access-key-id".path;
-            dcSecretKeyPath = config.clan.core.vars.generators.data-commons-s3.files."secret-access-key".path;
-
-            # Browser presigned PUT/GET is cross-origin, so the bucket needs
-            # the selected portal origin (LAN or invited demo). Garage exposes
-            # CORS only through the S3 PutBucketCors API — no CLI verb — so the
-            # oneshot signs the call with curl's native SigV4 (same mechanism as
-            # data-commons' devenv.nix). Full overwrite → idempotent.
-            dcCorsXml = pkgs.writeText "data-commons-cors.xml" ''
-              <CORSConfiguration>
-                <CORSRule>
-                  <AllowedOrigin>${settings.dataCommonsPortalOrigin}</AllowedOrigin>
-                  <AllowedMethod>PUT</AllowedMethod>
-                  <AllowedMethod>GET</AllowedMethod>
-                  <AllowedHeader>*</AllowedHeader>
-                  <ExposeHeader>ETag</ExposeHeader>
-                </CORSRule>
-              </CORSConfiguration>
-            '';
           in
           {
             # RPC secret — consumed only by this node, so scoped to the instance.
@@ -107,47 +78,12 @@
             # S3 API for Longhorn / k3s on the other nodes.
             networking.firewall.allowedTCPPorts = [ 3900 ];
 
-            # mDNS alias so LAN browsers following a presigned URL resolve
-            # `s3.local` to lenny's own address — the SAME name the
-            # data-commons module pins in-cluster (coredns `hosts` block) for
-            # app pods, since the host in a presigned URL is part of the
-            # SigV4 signature and must be byte-identical for both callers
-            # (data-commons-8qq). Published from lenny itself, unlike the
-            # data-commons.local/keycloak.local aliases atlas publishes for
-            # itself — avahi-publish just injects an mDNS record, it doesn't
-            # require the publishing host to own the address, but publishing
-            # from the address's actual owner is the simpler, more obviously
-            # correct choice here.
-            # avahi denies client entry groups unless user-service
-            # publishing is on, and avahi-publish is a client. Without this
-            # the unit below crash-loops under Restart=always and s3.local
-            # never resolves on the LAN — which breaks EVERY presigned
-            # upload/download, since the host is part of the SigV4 signature
-            # and has no fallback. Same flag, same reason, as
-            # modules/services/monitoring (which only ever needed it because
-            # it lands on atlas).
-            services.avahi.publish.userServices = true;
-            systemd.services.avahi-alias-s3 = {
-              description = "mDNS alias s3.local -> lenny (this host)";
-              after = [ "avahi-daemon.service" ];
-              requires = [ "avahi-daemon.service" ];
-              wantedBy = [ "multi-user.target" ];
-              serviceConfig = {
-                ExecStart = "${pkgs.avahi}/bin/avahi-publish -a -R s3.local 10.10.3.42";
-                Restart = "always";
-                RestartSec = 5;
-              };
-            };
-
             systemd.services.garage-provision = {
               description = "Provision Garage layout, buckets and backup key";
               wantedBy = [ "multi-user.target" ];
               after = [ "garage.service" ];
               wants = [ "garage.service" ];
-              path = [
-                config.services.garage.package
-                pkgs.curl
-              ];
+              path = [ config.services.garage.package ];
               serviceConfig = {
                 Type = "oneshot";
                 RemainAfterExit = true;
@@ -176,34 +112,11 @@
                 garage key info "$access" >/dev/null 2>&1 \
                   || garage key import --yes -n kin-backup "$access" "$secret"
 
-                for bucket in longhorn-backups etcd-snapshots loki-chunks cnpg-backups; do
+                for bucket in longhorn-backups etcd-snapshots loki-chunks; do
                   garage bucket info "$bucket" >/dev/null 2>&1 \
                     || garage bucket create "$bucket"
                   garage bucket allow "$bucket" --read --write --key "$access"
                 done
-
-                # ── data-commons object store ────────────────────────────
-                # Its own key, granted only on the data-commons bucket.
-                # --owner is required on top of read/write: CORS (and any other
-                # bucket-configuration op) goes through the S3 API and is
-                # owner-only.
-                dc_access=$(cat ${dcAccessKeyPath})
-                dc_secret=$(cat ${dcSecretKeyPath})
-                garage key info "$dc_access" >/dev/null 2>&1 \
-                  || garage key import --yes -n data-commons "$dc_access" "$dc_secret"
-
-                garage bucket info data-commons >/dev/null 2>&1 \
-                  || garage bucket create data-commons
-                garage bucket allow data-commons --read --write --owner --key "$dc_access"
-
-                # PutBucketCors against the local S3 API. Non-fatal: a failed
-                # CORS write must not wedge layout/bucket provisioning, and
-                # Restart=on-failure isn't set on this unit.
-                curl -sS -f -X PUT "http://127.0.0.1:3900/data-commons?cors" \
-                  --user "$dc_access:$dc_secret" \
-                  --aws-sigv4 "aws:amz:${garageSettings.s3_api.s3_region}:s3" \
-                  --upload-file ${dcCorsXml} \
-                  || echo "garage-provision: warn: PutBucketCors on data-commons failed"
               '';
             };
           };

@@ -59,7 +59,6 @@
           let
             namespace = "gl-trueup";
             gen = config.clan.core.vars.generators.gl-trueup;
-            # ghcr-pull is declared by kin/data-commons (same server).
             ghcrToken = config.clan.core.vars.generators.ghcr-pull.files."token".path;
             deployment = {
               apiVersion = "apps/v1";
@@ -171,6 +170,15 @@
             ]
             ++ lib.optional (settings.imageDigest != null) deployment;
 
+            # Name kept from the old fissio/data-commons modules so atlas' var carries over.
+            clan.core.vars.generators.ghcr-pull = {
+              prompts.token = {
+                description = "GitHub classic PAT `kin-ghcr-pull` (read:packages) for ghcr.io pulls";
+                type = "hidden";
+                persist = true;
+              };
+            };
+
             clan.core.vars.generators.gl-trueup = {
               prompts =
                 lib.genAttrs
@@ -189,7 +197,6 @@
             };
 
             # Secrets reach k8s via kubectl at activation, never via manifests
-            # (same pattern as data-commons-secrets).
             systemd.services.gl-trueup-secrets = {
               description =
                 lib.warnIf (settings.imageDigest == null)

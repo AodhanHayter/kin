@@ -8,11 +8,6 @@
 # toggle layer; `modules` registers kin's own services, `module.input = "self"`
 # pulls them, and `module.input = "clan-core"` pulls upstream prebuilt ones.
 { lib, ... }:
-let
-  # Prepared only. Enabling requires the invited-demo migration/publication gate
-  # in data-commons/docs/invited-demo.md; comin deploys pushed inventory changes.
-  dataCommonsInternetDemo = true;
-in
 {
   meta.name = "kin";
   # mDNS domain; surfaces as config.clan.core.settings.domain (used to derive
@@ -70,8 +65,6 @@ in
     "kin/ipa-rfp-model" = ./modules/services/ipa-rfp-model;
     "kin/gl-trueup" = ./modules/services/gl-trueup;
     "kin/comin" = ./modules/services/comin;
-    "kin/cnpg" = ./modules/services/cnpg;
-    "kin/data-commons" = ./modules/services/data-commons;
   };
 
   inventory.instances = {
@@ -200,25 +193,6 @@ in
       roles.default.tags.k3s-server = { };
     };
 
-    # ---- CloudNativePG operator: on-demand Postgres (server only) ----
-    cnpg = {
-      module = {
-        name = "kin/cnpg";
-        input = "self";
-      };
-      roles.default.tags.k3s-server = { };
-    };
-
-    # ---- data-commons platform (server applies chart + CNPG DB + secrets) ----
-    data-commons = {
-      module = {
-        name = "kin/data-commons";
-        input = "self";
-      };
-      roles.default.tags.k3s-server = { };
-      roles.default.settings.internetDemo = dataCommonsInternetDemo;
-    };
-
     # ---- Garage S3 backup target (lenny only) ----
     garage = {
       module = {
@@ -226,8 +200,6 @@ in
         input = "self";
       };
       roles.default.machines.lenny = { };
-      roles.default.settings.dataCommonsPortalOrigin =
-        if dataCommonsInternetDemo then "https://data-demo.fissio.com" else "http://data-commons.local";
     };
 
     # ---- ARC GitHub Actions runners (server only) ----
